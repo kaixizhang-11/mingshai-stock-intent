@@ -45,6 +45,10 @@ async function rateLimit(database, key, max, windowMs) {
   const scope = `${key}:${period}`;
   await database.prepare('INSERT INTO request_rates (key, period, count) VALUES (?, ?, 1) ON CONFLICT(key) DO UPDATE SET count = count + 1').bind(scope, period).run();
   const row = await database.prepare('SELECT count FROM request_rates WHERE key = ?').bind(scope).first();
+  if (Math.random() < 0.01) {
+    await database.prepare('DELETE FROM request_rates WHERE key LIKE ? AND period < ?').bind(`${key.split(':')[0]}:%`, period - 2).run();
+    await database.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(Date.now()).run();
+  }
   return row.count <= max;
 }
 
@@ -98,6 +102,7 @@ async function accountRoute(request, env, url) {
     const identity = await sha256(`${ip}:${email}`);
     const limit = path.endsWith('register') ? 5 : 10;
     if (!await rateLimit(database, `${path}:${identity}`, limit, path.endsWith('register') ? 3600000 : 900000)) return accountJson({ error: '尝试次数过多，请稍后再试' }, 429);
+    if (!await rateLimit(database, `${path}:ip:${await sha256(ip)}`, path.endsWith('register') ? 20 : 100, path.endsWith('register') ? 3600000 : 900000)) return accountJson({ error: '当前网络请求过于频繁，请稍后再试' }, 429);
     if (path.endsWith('register')) {
       if (password.length < 12 || password.length > 128) return accountJson({ error: '密码长度须为 12–128 个字符' }, 400);
       let stage = 'lookup';

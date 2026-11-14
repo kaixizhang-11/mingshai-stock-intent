@@ -14,8 +14,8 @@ const codes = Array.from({ length: 50 }, (_, index) => `${String(600000 + index)
 const universe = codes.map((thscode, index) => ({ thscode, name: `测试公司${index + 1}` }));
 const bars = Array.from({ length: 25 }, (_, index) => ({ date_ms: Date.UTC(2026, 9, index + 1), close_price: 100 + index * 0.1 }));
 const income = thscode => ({ thscode, timestamp: Date.now(), item: [
-  { fiscal_year: 2026, fiscal_period: 'Q3', period_end_ms: Date.UTC(2026, 8, 30), report_date_ms: Date.UTC(2026, 9, 30), operating_income: 120, parent_holder_net_profit: 22, currency: 'CNY' },
-  { fiscal_year: 2025, fiscal_period: 'Q3', period_end_ms: Date.UTC(2025, 8, 30), report_date_ms: Date.UTC(2025, 9, 30), operating_income: 100, parent_holder_net_profit: 20, currency: 'CNY' },
+  { fiscal_year: 2026, fiscal_period: 'Q3', period_end_ms: Date.UTC(2026, 8, 29, 16), report_date_ms: Date.UTC(2026, 9, 30), operating_income: 120, parent_holder_net_profit: 22, currency: 'CNY' },
+  { fiscal_year: 2025, fiscal_period: 'Q3', period_end_ms: Date.UTC(2025, 8, 29, 16), report_date_ms: Date.UTC(2025, 9, 30), operating_income: 100, parent_holder_net_profit: 20, currency: 'CNY' },
 ] });
 
 function fakeFetch({ failedIncome = false, missingValuation = false } = {}) {
@@ -51,7 +51,45 @@ test('market route returns 50 traceable stocks and preserves null valuation', as
     assert.equal(body.stocks[0].metrics.pe_ttm.value, null);
     assert.equal(body.stocks[0].metrics.revenue_yoy.raw.currentField, 'operating_income');
     assert.equal(body.stocks[0].metrics.revenue_yoy.source.requestId, 'test-request');
+    assert.equal(body.stocks[0].metrics.revenue_yoy.source.reportEnd, '2026-09-30');
+    const cached = await DB.prepare('SELECT data_json, lease_until FROM market_cache WHERE id = 1').first();
+    assert.equal(cached.lease_until, 0);
+    assert.equal(JSON.parse(cached.data_json).stocks.length, 50);
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test('two Worker isolates share one upstream market refresh through D1 lease', async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamCalls = 0;
+  let releaseUpstream;
+  let reachedUpstream;
+  const hold = new Promise(resolve => { releaseUpstream = resolve; });
+  const started = new Promise(resolve => { reachedUpstream = resolve; });
+  const upstream = fakeFetch();
+  globalThis.fetch = async (...args) => { upstreamCalls++; if (new URL(args[0]).pathname.endsWith('/ths-stock-list')) { reachedUpstream(); await hold; } return upstream(...args); };
+  try {
+    const { DB, cookie } = await signedIn();
+    let leaseAttempts = 0;
+    const originalPrepare = DB.prepare.bind(DB);
+    DB.prepare = sql => { if (sql.startsWith('INSERT INTO market_cache')) leaseAttempts++; return originalPrepare(sql); };
+    const firstWorker = (await import('../dist/server/index.js?lease=first')).default;
+    const secondWorker = (await import('../dist/server/index.js?lease=second')).default;
+    const env = { DB, FUYAO_API_KEY: 'test' };
+    const first = firstWorker.fetch(new Request('https://example.test/api/market', { headers: { cookie } }), env);
+    await started;
+    const second = secondWorker.fetch(new Request('https://example.test/api/market', { headers: { cookie } }), env);
+    for (let attempt = 0; attempt < 50 && leaseAttempts < 2; attempt++) await new Promise(resolve => setTimeout(resolve, 2));
+    assert.equal(leaseAttempts, 2);
+    releaseUpstream();
+    const [a, b] = await Promise.all([first, second]);
+    assert.equal(a.status, 200);
+    assert.equal(b.status, 200);
+    assert.equal(upstreamCalls, 13);
+    const bodies = await Promise.all([a, b].map(response => response.json()));
+    assert.deepEqual(bodies.map(body => body.stocks.length), [50, 50]);
+    assert.deepEqual(bodies.map(body => body.cache).sort(), ['fresh', 'shared']);
+    DB.close();
+  } finally { releaseUpstream(); globalThis.fetch = originalFetch; }
 });
 
 test('partial financial API failure leaves affected stocks unknown', async () => {

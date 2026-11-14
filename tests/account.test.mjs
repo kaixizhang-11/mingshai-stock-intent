@@ -69,6 +69,17 @@ test('auth rejects weak passwords and cross-site writes', async () => {
   DB.close();
 });
 
+test('registration is rate limited across different emails from one IP', async () => {
+  const DB = createLocalDb();
+  for (let index = 0; index < 20; index++) {
+    const response = await worker.fetch(request('/api/auth/register', 'POST', { email: `weak-${index}@example.com`, password: 'short' }), accountEnv(DB));
+    assert.equal(response.status, 400);
+  }
+  const blocked = await worker.fetch(request('/api/auth/register', 'POST', { email: 'weak-21@example.com', password: 'short' }), accountEnv(DB));
+  assert.equal(blocked.status, 429);
+  DB.close();
+});
+
 test('account deletion removes private strategies and invalidates session', async () => {
   const DB = createLocalDb();
   const cookie = await register(DB, 'delete@example.com');

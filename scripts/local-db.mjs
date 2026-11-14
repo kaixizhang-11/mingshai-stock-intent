@@ -9,6 +9,10 @@ export function createLocalDb(filename = ':memory:') {
   if (!sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'").get()) {
     sqlite.exec(readFileSync(resolve(import.meta.dirname, '../drizzle/0000_accounts.sql'), 'utf8'));
   }
+  const columns = sqlite.prepare('PRAGMA table_info(market_cache)').all();
+  if (!columns.some(column => column.name === 'lease_until')) {
+    sqlite.exec(readFileSync(resolve(import.meta.dirname, '../drizzle/0001_market_lease.sql'), 'utf8'));
+  }
   return {
     prepare(sql) {
       return {

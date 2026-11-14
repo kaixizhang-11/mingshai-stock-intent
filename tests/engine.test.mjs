@@ -24,4 +24,5 @@ test('conflicting bounds prevent execution', () => {
   assert.match(findConflicts([{ metric: 'pe_ttm', op: 'gt', value: 40 }, { metric: 'pe_ttm', op: 'lt', value: 20 }])[0], /市盈率/);
   assert.match(findConflicts([{ metric: 'revenue_yoy', op: 'between', value: 15, max: 5 }])[0], /下限/);
   assert.equal(findConflicts([{ metric: 'pe_ttm', op: 'gt', value: 0 }, { metric: 'pe_ttm', op: 'lte', value: 30 }]).length, 0);
+  assert.match(findConflicts([{ metric: 'pe_ttm', op: 'lte', value: NaN }])[0], /阈值不是有效数字/);
 });

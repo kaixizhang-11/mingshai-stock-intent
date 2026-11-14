@@ -39,7 +39,10 @@ function showAuth() {
   state.compare.clear();
   state.strategies = [];
   state.previousPass = null;
+  state.tab = 'pass';
+  document.querySelectorAll('.tab').forEach(tab => { tab.classList.toggle('active', tab.dataset.tab === 'pass'); tab.setAttribute('aria-selected', String(tab.dataset.tab === 'pass')); });
   $('#intent-input').value = '经营改善、估值合理、走势相对稳定';
+  $('#auth-email').value = '';
   $('#clarify-panel').hidden = true;
   $('#auth-screen').hidden = false;
   $('#app-shell').hidden = true;
@@ -103,8 +106,8 @@ function renderConditions() {
     <span class="condition-number">${String(index + 1).padStart(2, '0')}</span>
     <label class="sr-only" for="metric-${index}">指标</label><select id="metric-${index}" data-field="metric">${Object.entries(FIELDS).map(([key, field]) => `<option value="${key}" ${c.metric === key ? 'selected' : ''}>${field.name}</option>`).join('')}</select>
     <label class="sr-only" for="op-${index}">比较方式</label><select id="op-${index}" data-field="op">${Object.entries(OPERATORS).map(([key, label]) => `<option value="${key}" ${c.op === key ? 'selected' : ''}>${label}</option>`).join('')}</select>
-    <label class="sr-only" for="value-${index}">阈值</label><input id="value-${index}" data-field="value" type="number" step="any" value="${Number.isFinite(c.value) ? c.value : 0}">
-    ${c.op === 'between' ? `<label class="sr-only" for="max-${index}">上限</label><input id="max-${index}" data-field="max" type="number" step="any" value="${Number.isFinite(c.max) ? c.max : 30}">` : `<span class="condition-unit">${FIELDS[c.metric]?.unit || ''}</span>`}
+    <label class="sr-only" for="value-${index}">阈值</label><input id="value-${index}" data-field="value" type="number" step="any" value="${Number.isFinite(c.value) ? c.value : ''}">
+    ${c.op === 'between' ? `<label class="sr-only" for="max-${index}">上限</label><input id="max-${index}" data-field="max" type="number" step="any" value="${Number.isFinite(c.max) ? c.max : ''}">` : `<span class="condition-unit">${FIELDS[c.metric]?.unit || ''}</span>`}
     <button type="button" class="remove-condition" aria-label="删除第 ${index + 1} 条条件" data-remove="${index}">×</button>
   </div>`).join('');
   const assumptionBox = $('#assumptions');
@@ -226,7 +229,7 @@ function openStock(code) {
   }).join('');
   const sources = [...new Set(item.checks.map(({ condition }) => condition.metric))].map(key => {
     const value = stock.metrics[key]; const source = value?.source || {};
-    return `<details class="source-card"><summary>${esc(FIELDS[key].name)} · 查看原始依据</summary><p>来源：${esc(source.provider || '—')} · <a href="${FIELDS[key].doc}" target="_blank" rel="noopener noreferrer">字段文档 ↗</a><br>接口：<code>${esc(source.endpoint || '—')}</code><br>报告期：${esc(source.reportEnd || '—')} · 披露日：${esc(source.published || '—')} · 比较期：${esc(source.priorReportEnd || '—')} · 数据日期：${esc(source.asOf || '—')}<br>原始字段：${rawText(value.raw)}<br>计算口径：${esc(source.method || '—')}<br>请求追踪 ID：${esc(source.requestId || '未提供')}</p></details>`;
+    return `<details class="source-card"><summary>${esc(FIELDS[key].name)} · 查看原始依据</summary><p>来源：${esc(source.provider || '—')} · <a href="${FIELDS[key].doc}" target="_blank" rel="noopener noreferrer">字段文档 ↗</a><br>接口：<code>${esc(source.endpoint || '—')}</code><br>报告期：${esc(source.reportEnd || '—')} · 接口报告日：${esc(source.published || '—')} · 比较期：${esc(source.priorReportEnd || '—')} · 数据日期：${esc(source.asOf || '—')}<br>原始字段：${rawText(value.raw)}<br>计算口径：${esc(source.method || '—')}<br>请求追踪 ID：${esc(source.requestId || '未提供')}</p></details>`;
   }).join('');
   $('#dialog-body').innerHTML = `<div class="section-index">EVIDENCE / ${esc(stock.code)}</div><div class="dialog-head"><div><h2 id="dialog-title">${esc(stock.name)}</h2><p>${esc(stock.code)} · 最新价 ${num(stock.latestPrice, 2)} 元 · 行情日期 ${esc(stock.priceAsOf || '—')}</p></div><span class="pill ${item.status}">${pill}</span></div><div class="dialog-summary">${item.status === 'pass' ? '当前所有条件均有数据且通过。' : item.status === 'fail' ? `至少一项未达到条件：${esc(item.checks.filter(row => row.status === 'fail').map(row => conditionText(row.condition)).join('；'))}` : '没有明确未通过的条件，但至少一项必要数据缺失。'}${stock.missing?.length ? `<br>接口情况：${stock.missing.map(esc).join('；')}` : ''}</div><table class="evidence-table"><thead><tr><th>当前条件</th><th>实际数据</th><th>结论</th><th>时点</th></tr></thead><tbody>${evidence}</tbody></table><div style="margin-top:22px" class="section-index">SOURCE TRACE / 原始依据</div>${sources}`;
   $('#stock-dialog').showModal();
@@ -248,7 +251,7 @@ async function loadMarket(refresh = false) {
     $('#universe-count').textContent = data.universeCount;
     $('#universe-asof').textContent = data.universeAsOf || '未提供';
     $('#fetched-at').textContent = asDateTime(data.fetchedAt);
-    $('#data-status').className = 'data-status ok'; $('#data-status').textContent = `${data.stocks.length} 只成分股已载入 · ${data.cache === 'memory' || data.cache === 'database' ? '15 分钟共享缓存' : '本次实时获取'}`;
+    $('#data-status').className = 'data-status ok'; $('#data-status').textContent = `${data.stocks.length} 只成分股已载入 · ${['memory', 'database', 'shared'].includes(data.cache) ? '15 分钟共享缓存' : '本次实时获取'}`;
     $('#top-data-state').textContent = '真实数据已连接';
     $('#tool-footprint').innerHTML = `<strong>工具调用足迹</strong>${(data.toolFootprint || []).map(item => `<div><span>${({ snapshot: '行情快照', valuation: '估值快照', income: '批量利润表', history: '批量日线' })[item.type] || esc(item.type)}</span><span>${item.succeeded}/${item.requests} 成功</span></div>`).join('')}`;
     const issues = $('#api-issues'); issues.hidden = !data.issues.length;
@@ -310,7 +313,7 @@ $('#condition-list').addEventListener('change', event => {
   const card = event.target.closest('.condition-card'); if (!card) return;
   const index = Number(card.dataset.index); const field = event.target.dataset.field;
   if (!field) return;
-  state.conditions[index][field] = field === 'value' || field === 'max' ? Number(event.target.value) : event.target.value;
+  state.conditions[index][field] = field === 'value' || field === 'max' ? (event.target.value.trim() === '' ? NaN : Number(event.target.value)) : event.target.value;
   if (field === 'op' && event.target.value === 'between' && !Number.isFinite(state.conditions[index].max)) state.conditions[index].max = 30;
   state.conditions[index].label = '用户已修改';
   execute();

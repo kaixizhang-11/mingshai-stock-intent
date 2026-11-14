@@ -64,8 +64,11 @@ function validNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+const chinaDateFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' });
 function date(ms) {
-  return typeof ms === 'number' && Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : null;
+  if (typeof ms !== 'number' || !Number.isFinite(ms)) return null;
+  const parts = Object.fromEntries(chinaDateFormatter.formatToParts(new Date(ms)).map(part => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 function metric(value, unit, source, extras = {}) {
@@ -99,19 +102,19 @@ function normalize(universe, snapshotResult, valuationResult, incomeGroups, pric
   return universe.map(stock => {
     const code = stock.thscode;
     const incomeGroup = incomes.get(code);
-    const rows = (incomeGroup?.item || []).filter(row => row?.period_end_ms && row?.report_date_ms && row.report_date_ms <= Date.now());
+    const rows = (incomeGroup?.item || []).filter(row => row?.period_end_ms && row?.report_date_ms && row.report_date_ms <= Date.now()).sort((a, b) => b.period_end_ms - a.period_end_ms);
     const latest = rows[0] || null;
     const comparable = latest ? rows.find(row => row.fiscal_year === latest.fiscal_year - 1 && row.fiscal_period === latest.fiscal_period) : null;
     const valuation = valuations.get(code);
     const history = histories.get(code);
-    const bars = (history?.item || []).filter(row => row?.date_ms && row.date_ms <= Date.now());
+    const bars = (history?.item || []).filter(row => row?.date_ms && row.date_ms <= Date.now()).sort((a, b) => a.date_ms - b.date_ms);
     const snap = snapshots.get(code);
     const incomeSource = {
       provider: '扶摇金融数据', endpoint: '/api/a-share/financials/income-statements-batch',
       requestId: incomeGroup?._requestId || null,
       reportEnd: date(latest?.period_end_ms), published: date(latest?.report_date_ms),
       priorReportEnd: date(comparable?.period_end_ms), priorPublished: date(comparable?.report_date_ms),
-      method: '同一财报期间的本年累计值 ÷ 上年同期累计值 − 1；上年值≤0时记为缺失',
+      method: '同一财报期间的本年字段值 ÷ 上年同期字段值 − 1；上年值≤0时记为缺失',
     };
     const valuationSource = {
       provider: '扶摇金融数据', endpoint: '/api/a-share/valuations/snapshot',
@@ -188,6 +191,31 @@ async function loadMarket(env) {
   };
 }
 
+async function loadSharedMarket(env) {
+  const database = db(env);
+  const started = Date.now();
+  const owner = crypto.randomUUID();
+  const acquired = await database.prepare("INSERT INTO market_cache (id, data_json, fetched_at, lease_until, lease_owner) VALUES (1, '{}', 0, ?, ?) ON CONFLICT(id) DO UPDATE SET lease_until = excluded.lease_until, lease_owner = excluded.lease_owner WHERE market_cache.lease_until < ?").bind(started + 120000, owner, started).run();
+  if (acquired.meta?.changes) {
+    try {
+      const data = await loadMarket(env);
+      const fetchedAt = Date.now();
+      await database.prepare('UPDATE market_cache SET data_json = ?, fetched_at = ?, lease_until = 0, lease_owner = NULL WHERE id = 1 AND lease_owner = ?').bind(JSON.stringify(data), fetchedAt, owner).run();
+      return { data, fetchedAt, cache: 'fresh' };
+    } catch (error) {
+      await database.prepare('UPDATE market_cache SET lease_until = 0, lease_owner = NULL WHERE id = 1 AND lease_owner = ?').bind(owner).run();
+      throw error;
+    }
+  }
+  for (let attempt = 0; attempt < 45; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const row = await database.prepare('SELECT data_json, fetched_at, lease_until FROM market_cache WHERE id = 1').first();
+    if (row && row.lease_until === 0 && row.fetched_at >= started - 1000 && row.fetched_at <= Date.now()) return { data: JSON.parse(row.data_json), fetchedAt: row.fetched_at, cache: 'shared' };
+    if (row && row.lease_until === 0) break;
+  }
+  throw new Error('共享数据刷新未完成，请稍后重试');
+}
+
 async function interpret(request, env) {
   const body = await request.json().catch(() => ({}));
   const text = typeof body.text === 'string' ? body.text.trim().slice(0, 500) : '';
@@ -252,13 +280,11 @@ export default {
             return json({ ...data, cache: 'database' });
           }
         }
-        if (!marketPromise) marketPromise = loadMarket(env).finally(() => { marketPromise = null; });
+        if (!marketPromise) marketPromise = loadSharedMarket(env).finally(() => { marketPromise = null; });
         try {
-          const data = await marketPromise;
-          const now = Date.now();
-          marketCache = { data, time: now };
-          await db(env).prepare('INSERT INTO market_cache (id, data_json, fetched_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET data_json = excluded.data_json, fetched_at = excluded.fetched_at').bind(JSON.stringify(data), now).run();
-          return json({ ...data, cache: 'fresh' });
+          const result = await marketPromise;
+          marketCache = { data: result.data, time: result.fetchedAt };
+          return json({ ...result.data, cache: result.cache });
         } catch (error) { return json({ error: `金融数据获取失败：${error?.message || '未知错误'}` }, 502); }
       }
     } catch (error) {

@@ -49,18 +49,18 @@ npm run dev
                     浏览器确定性规则引擎（三态结果）
 ```
 
-AI 输出只接受五个白名单字段、五种运算符与有限数值；无法执行的要求显式展示。规则引擎不调用模型，缺失值不会按零或通过处理。D1 存账号、会话、策略、调用额度及 15 分钟共享数据缓存。每账号每天最多 20 次 AI 解析，每小时最多 2 次强制刷新。登录/注册按 IP 与邮箱组合限流。
+AI 输出只接受五个白名单字段、五种运算符与有限数值；无法执行的要求显式展示。规则引擎不调用模型，缺失值不会按零或通过处理。D1 存账号、会话、策略、调用额度及 15 分钟共享数据缓存；缓存失效时用 D1 租约协调并发取数。每账号每天最多 20 次 AI 解析，每小时最多 2 次强制刷新。登录/注册同时按 IP 与 IP+邮箱限流，并清理过期额度及会话记录。
 
 ## 数据字段、公式和追溯
 
 | 产品指标 | 扶摇来源 | 计算口径 |
 | --- | --- | --- |
-| 营业收入同比 | `/api/a-share/financials/income-statements-batch` 的 `operating_income` | 最近已披露报告期的本年累计值 ÷ 上年同一财报期间累计值 − 1。上年值 ≤ 0、未披露或接口异常则缺失。 |
+| 营业收入同比 | `/api/a-share/financials/income-statements-batch` 的 `operating_income` | 最近已披露报告期的本年字段值 ÷ 上年同一财报期间字段值 − 1。上年值 ≤ 0、未披露或接口异常则缺失。 |
 | 归母净利润同比 | 同接口的 `parent_holder_net_profit` | 同上。 |
 | PE TTM / PB MRQ | `/api/a-share/valuations/snapshot` 的 `pe_ttm` / `pb_mrq` | 保留接口原值；示例“合理”仅为可编辑的 PE 工作假设。 |
 | 近 20 日年化波动率 | `/api/a-share/prices/historical-batch` 的前复权 `close_price` | 最近 21 个收盘价形成 20 个日对数收益率；样本标准差 × √252 × 100%。不足 21 个点则缺失。 |
 
-股票池来自 `/api/a-share-index/constituents/ths-stock-list`，最新价格来自 `/api/a-share/prices/snapshot`。每个指标携带接口、原始字段、报告期/披露日或行情日期、请求 ID、单位与计算口径；取数时间单独显示。来源接口文档见 [扶摇文档](https://fuyao.aicubes.cn/docs/)。
+股票池来自 `/api/a-share-index/constituents/ths-stock-list`，最新价格来自 `/api/a-share/prices/snapshot`。每个指标携带接口、原始字段、报告期/接口报告日期或行情日期、请求 ID、单位与计算口径；取数时间单独显示。日期按北京时间展示。来源接口文档见 [扶摇文档](https://fuyao.aicubes.cn/docs/)。
 
 ## 账号与安全边界
 
