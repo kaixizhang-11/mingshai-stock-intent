@@ -414,6 +414,7 @@ export default {
         } catch (error) { return json({ error: `金融数据获取失败：${error?.message || '未知错误'}` }, 502); }
       }
     } catch (error) {
+      console.error('MINGSHAI_API_ERROR', url.pathname, error?.name || 'Error', error?.message || 'unknown');
       return json({ error: /数据库尚未连接/.test(String(error?.message)) ? '账号数据库暂不可用' : '服务暂不可用，请稍后重试' }, 503);
     }
     return new Response('Not found', { status: 404 });
