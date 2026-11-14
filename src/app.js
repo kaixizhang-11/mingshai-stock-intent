@@ -269,8 +269,10 @@ async function loadMarket(refresh = false) {
     if (/请先注册或登录/.test(error.message)) return showAuth();
     $('#data-status').className = 'data-status error'; $('#data-status').textContent = error.message || '取数失败';
     $('#top-data-state').textContent = '数据连接异常';
+    state.market = null;
+    state.previousPass = null;
     toast('数据连接失败，请检查接口状态后重试');
-    if (!state.market) renderResults();
+    execute();
   } finally { state.loading = false; $('#refresh-data').disabled = false; }
 }
 
@@ -313,7 +315,7 @@ async function interpret(followUp = false) {
     $('#interpret-status').textContent = state.planStatus === 'ready' ? `已逐项核对意图，生成 ${result.conditions.length} 条可编辑条件。` : '已有条件草案，但完整意图尚未确认；请先回答澄清问题，不会提前展示候选股票。';
     execute();
     if (!followUp) $('#conditions').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  } catch (error) { if (/请先注册或登录/.test(error.message)) return showAuth(); $('#interpret-status').textContent = error.message; toast('AI 暂不可用，可手动修改当前条件'); }
+  } catch (error) { if (/请先注册或登录/.test(error.message)) return showAuth(); state.planStatus = 'needs_clarification'; state.blockers = ['AI 解析失败，无法确认当前意图是否被条件完整覆盖。']; state.previousPass = null; execute(); $('#interpret-status').textContent = error.message; toast('AI 暂不可用，当前意图不会执行筛选'); }
   finally { button.disabled = false; }
 }
 
