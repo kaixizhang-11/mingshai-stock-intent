@@ -17,6 +17,7 @@
 ```bash
 export FUYAO_API_KEY='在本地环境中设置'
 export DEEPSEEK_API_KEY='在本地环境中设置'
+export AUTH_PEPPER='为本地或生产环境分别设置的随机长密钥'
 npm run build
 npm run validate
 npm test
@@ -25,7 +26,7 @@ npm run dev
 
 打开 `http://127.0.0.1:4173/`，注册一个用于测试的邮箱与 12 位以上密码。注册与登录写入本地 `.local/preview.sqlite`；线上写入 D1。首次发布时平台应用 `drizzle/0000_accounts.sql`。本地数据库不会打包进部署产物。
 
-部署环境变量：`FUYAO_API_KEY`、`DEEPSEEK_API_KEY`。`.openai/hosting.json` 只声明 D1 绑定 `DB`，不包含密钥。使用 Sites 的源代码推送、保存版本、发布流程。
+部署环境变量：`FUYAO_API_KEY`、`DEEPSEEK_API_KEY`、`AUTH_PEPPER`。`.openai/hosting.json` 只声明 D1 绑定 `DB`，不包含密钥。`AUTH_PEPPER` 一旦用于注册，不可随意更换，否则旧账号密码无法验证。使用 Sites 的源代码推送、保存版本、发布流程。
 
 ## 用户流程
 
@@ -63,7 +64,7 @@ AI 输出只接受五个白名单字段、五种运算符与有限数值；无�
 
 ## 账号与安全边界
 
-- 密码用随机盐与 PBKDF2-SHA256（210,000 次）散列；数据库不存明文。会话使用随机令牌，只存 SHA-256 摘要；策略按 `user_id` 查询，不能跨账号读取或删除。
+- 密码先用服务端密钥进行 HMAC-SHA256，再用随机盐与 PBKDF2-SHA256（100,000 次，[Cloudflare Workers 单次上限](https://github.com/cloudflare/workerd/issues/1346)）散列；数据库不存明文。会话使用随机令牌，只存 SHA-256 摘要；策略按 `user_id` 查询，不能跨账号读取或删除。
 - 更改状态的请求检查同源 `Origin` / `Sec-Fetch-Site`；Cookie 为 HttpOnly、SameSite=Lax，线上 HTTPS 时设置 Secure。
 - 当前无邮箱所有权验证、邮件找回密码或双因素验证；用户可输入当前密码自助删除账号与策略。面向大规模开放注册前，需要补齐邮件服务、账号恢复、监控告警、数据库备份、限流与成本控制，并完成安全审计。
 - 财务期、估值快照和价格时点不同；跨行业直接比较 PE 容易失真；当前“经营改善”仅用两个同比指标近似表达。结果是研究线索，不构成买卖建议。

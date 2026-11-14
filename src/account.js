@@ -24,9 +24,12 @@ async function sha256(text) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(text)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function passwordHash(password, salt) {
-  const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
-  return base64(new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: unbase64(salt), iterations: 210000 }, key, 256)));
+async function passwordHash(password, salt, pepper) {
+  if (!pepper) throw new Error('账号加密密钥尚未配置');
+  const hmacKey = await crypto.subtle.importKey('raw', encoder.encode(pepper), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const mixed = await crypto.subtle.sign('HMAC', hmacKey, encoder.encode(password));
+  const key = await crypto.subtle.importKey('raw', mixed, 'PBKDF2', false, ['deriveBits']);
+  return base64(new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: unbase64(salt), iterations: 100000 }, key, 256)));
 }
 
 function equalBytes(a, b) {
@@ -105,7 +108,7 @@ async function accountRoute(request, env, url) {
         const id = crypto.randomUUID();
         const salt = base64(crypto.getRandomValues(new Uint8Array(16)));
         stage = 'hash';
-        const hash = await passwordHash(password, salt);
+        const hash = await passwordHash(password, salt, env.AUTH_PEPPER);
         stage = 'insert';
         try { await database.prepare('INSERT INTO users (id, email, password_salt, password_hash, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, email, salt, hash, Date.now()).run(); }
         catch { return accountJson({ error: '邮箱已注册或注册失败' }, 409); }
@@ -117,7 +120,7 @@ async function accountRoute(request, env, url) {
       }
     }
     const user = await database.prepare('SELECT id, email, password_salt, password_hash FROM users WHERE email = ?').bind(email).first();
-    const candidate = await passwordHash(password, user?.password_salt || base64(new Uint8Array(16)));
+    const candidate = await passwordHash(password, user?.password_salt || base64(new Uint8Array(16)), env.AUTH_PEPPER);
     if (!user || !equalBytes(candidate, user.password_hash)) return accountJson({ error: '邮箱或密码不正确' }, 401);
     return accountJson({ user: { id: user.id, email: user.email } }, 200, { 'set-cookie': await createSession(database, user.id, request) });
   }
@@ -134,7 +137,7 @@ async function accountRoute(request, env, url) {
     const password = String(body.password || '');
     if (!password || password.length > 128) return accountJson({ error: '请输入当前密码' }, 400);
     const row = await database.prepare('SELECT password_salt, password_hash FROM users WHERE id = ?').bind(user.id).first();
-    if (!row || !equalBytes(await passwordHash(password, row.password_salt), row.password_hash)) return accountJson({ error: '密码不正确' }, 403);
+    if (!row || !equalBytes(await passwordHash(password, row.password_salt, env.AUTH_PEPPER), row.password_hash)) return accountJson({ error: '密码不正确' }, 403);
     await database.prepare('DELETE FROM users WHERE id = ?').bind(user.id).run();
     return accountJson({ deleted: true }, 200, { 'set-cookie': clearCookie(request) });
   }

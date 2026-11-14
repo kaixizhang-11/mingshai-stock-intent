@@ -5,7 +5,7 @@ import { createLocalDb } from '../scripts/local-db.mjs';
 
 async function signedIn(email = 'test@example.com') {
   const DB = createLocalDb();
-  const response = await worker.fetch(new Request('https://example.test/api/auth/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password: 'strong-passphrase-123' }) }), { DB });
+  const response = await worker.fetch(new Request('https://example.test/api/auth/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password: 'strong-passphrase-123' }) }), { DB, AUTH_PEPPER: 'test-pepper-only' });
   assert.equal(response.status, 201);
   return { DB, cookie: response.headers.get('set-cookie').split(';')[0] };
 }

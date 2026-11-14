@@ -7,7 +7,7 @@ import { createLocalDb } from './local-db.mjs';
 const root = resolve(import.meta.dirname, '..');
 if (existsSync(resolve(root, '.env.local'))) process.loadEnvFile(resolve(root, '.env.local'));
 const port = Number(process.env.PORT || 4173);
-const env = { DB: createLocalDb(resolve(root, '.local/preview.sqlite')), FUYAO_API_KEY: process.env.FUYAO_API_KEY, DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || process.env.TEST_DEEPSEEK_KEY };
+const env = { DB: createLocalDb(resolve(root, '.local/preview.sqlite')), FUYAO_API_KEY: process.env.FUYAO_API_KEY, DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || process.env.TEST_DEEPSEEK_KEY, AUTH_PEPPER: process.env.AUTH_PEPPER };
 
 http.createServer(async (incoming, outgoing) => {
   try {
