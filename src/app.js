@@ -6,6 +6,7 @@ const FIELDS = {
   pe_ttm: { name: '市盈率 TTM', short: 'PE TTM', unit: '倍', doc: 'https://fuyao.aicubes.cn/docs/api-reference/valuations/' },
   pb_mrq: { name: '市净率 MRQ', short: 'PB MRQ', unit: '倍', doc: 'https://fuyao.aicubes.cn/docs/api-reference/valuations/' },
   volatility_20d: { name: '20 日年化波动率', short: '20日波动', unit: '%', doc: 'https://fuyao.aicubes.cn/docs/api-reference/prices/' },
+  profitable_years_3y: { name: '近 3 年盈利年数', short: '连续盈利', unit: '年', doc: 'https://fuyao.aicubes.cn/docs/api-reference/financials/' },
 };
 const OPERATORS = { gt: '>', gte: '≥', lt: '<', lte: '≤', between: '区间' };
 const DEFAULTS = [
@@ -15,7 +16,7 @@ const DEFAULTS = [
   { metric: 'pe_ttm', op: 'lte', value: 30, label: '估值合理暂按 PE TTM ≤ 30 倍' },
   { metric: 'volatility_20d', op: 'lte', value: 30, label: '稳定暂按近 20 日年化波动率 ≤ 30%' },
 ];
-const state = { user: null, market: null, conditions: structuredClone(DEFAULTS), assumptions: ['“估值合理”暂以 PE TTM 0–30 倍表达；“稳定”暂以 20 日年化波动率不超过 30% 表达。两项均为可修改的工作假设。'], unsupported: [], clarifications: [], intentBase: '', followUps: [], tab: 'pass', results: [], compare: new Set(), previousPass: null, loading: false, strategies: [] };
+const state = { user: null, market: null, conditions: structuredClone(DEFAULTS), assumptions: [], unsupported: [], clarifications: [], requirements: [], blockers: [], planStatus: 'idle', intentBase: '', followUps: [], tab: 'pass', results: [], compare: new Set(), previousPass: null, loading: false, strategies: [] };
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const num = (value, digits = 1) => typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(value) : '—';
@@ -34,6 +35,7 @@ function showAuth() {
   state.assumptions = [];
   state.unsupported = [];
   state.clarifications = [];
+  state.requirements = []; state.blockers = []; state.planStatus = 'idle';
   state.intentBase = '';
   state.followUps = [];
   state.compare.clear();
@@ -116,6 +118,9 @@ function renderConditions() {
   const unsupportedBox = $('#unsupported');
   unsupportedBox.hidden = state.unsupported.length === 0;
   unsupportedBox.innerHTML = `<strong>当前数据无法执行：</strong>${state.unsupported.map(esc).join('；')}。这些要求未被静默纳入筛选。`;
+  const coverage = $('#intent-coverage');
+  coverage.hidden = state.requirements.length === 0 && state.blockers.length === 0;
+  coverage.innerHTML = `<strong>需求覆盖检查 · ${state.planStatus === 'ready' ? '可以执行' : '尚不能按完整意图筛选'}</strong>${state.requirements.map(item => `<div class="coverage-item"><span class="coverage-tag ${esc(item.status)}">${item.status === 'mapped' ? '已映射' : item.status === 'clarify' ? '待澄清' : '数据不足'}</span><span>${esc(item.text)}<small>${esc(item.reason)}</small></span></div>`).join('')}${state.blockers.length ? `<p class="coverage-blocker">${state.blockers.map(esc).join('；')}</p>` : ''}`;
   const conflicts = findConflicts(state.conditions);
   const conflictBox = $('#conflicts');
   conflictBox.hidden = conflicts.length === 0;
@@ -131,7 +136,7 @@ function conditionText(c) {
 
 function execute() {
   const conflicts = renderConditions();
-  if (!state.market || conflicts.length || !state.conditions.length) {
+  if (!state.market || state.planStatus !== 'ready' || conflicts.length || !state.conditions.length) {
     state.results = [];
     renderStats(null);
     renderResults();
@@ -154,7 +159,7 @@ function renderStats(delta) {
   const counts = { pass: 0, fail: 0, unknown: 0 };
   state.results.forEach(item => { counts[item.status]++; });
   for (const key of Object.keys(counts)) {
-    $(`#count-${key}`).textContent = state.market && state.conditions.length && !findConflicts(state.conditions).length ? counts[key] : '—';
+    $(`#count-${key}`).textContent = state.market && state.planStatus === 'ready' && state.conditions.length && !findConflicts(state.conditions).length ? counts[key] : '—';
     $(`#tab-${key}`).textContent = counts[key];
   }
   $('#tab-compare').textContent = state.compare.size;
@@ -166,7 +171,7 @@ function renderStats(delta) {
     const name = code => state.market?.stocks.find(stock => stock.code === code)?.name || code;
     changeDetail.innerHTML = `<strong>本次条件变化：</strong>${delta.added ? `<span>新入选 ${delta.added} 只：${delta.addedCodes.slice(0, 6).map(code => esc(name(code))).join('、')}${delta.added > 6 ? '等' : ''}</span>` : ''}${delta.removed ? `<span>离开入选 ${delta.removed} 只：${delta.removedCodes.slice(0, 6).map(code => esc(name(code))).join('、')}${delta.removed > 6 ? '等' : ''}</span>` : ''}`;
   }
-  $('#result-subtitle').textContent = !state.market ? '数据载入后，会按当前条件确定性计算。' : findConflicts(state.conditions).length ? '当前条件存在冲突，需先修改。' : `以上证50当前 ${state.market.universeCount} 只成分股为范围，按 ${state.conditions.length} 条条件计算。`;
+  $('#result-subtitle').textContent = !state.market ? '数据载入后，先解析并确认意图。' : state.planStatus !== 'ready' ? '需要先确认完整意图；当前条件只是草案，暂不产生候选股票。' : findConflicts(state.conditions).length ? '当前条件存在冲突，需先修改。' : `以上证50当前 ${state.market.universeCount} 只成分股为范围，按 ${state.conditions.length} 条条件计算。`;
 }
 
 function statusSummary(item) {
@@ -194,6 +199,7 @@ function renderCompare() {
     ['筛选状态', item => item.status === 'pass' ? '入选' : item.status === 'fail' ? '排除' : '待核查'],
     ['营业收入同比', item => `${num(item.stock.metrics.revenue_yoy.value)}%`],
     ['归母净利润同比', item => `${num(item.stock.metrics.profit_yoy.value)}%`],
+    ['近 3 年盈利年数', item => `${num(item.stock.metrics.profitable_years_3y?.value, 0)} 年`],
     ['PE TTM', item => `${num(item.stock.metrics.pe_ttm.value)} 倍`],
     ['PB MRQ', item => `${num(item.stock.metrics.pb_mrq.value)} 倍`],
     ['20 日年化波动率', item => `${num(item.stock.metrics.volatility_20d.value)}%`],
@@ -204,6 +210,7 @@ function renderCompare() {
 function renderResults() {
   const list = $('#result-list');
   if (!state.market) { list.innerHTML = `<div class="empty-state"><strong>正在等待真实数据</strong><p>页面会从扶摇接口获取上证50成分股、财务、估值与历史行情。</p></div>`; return; }
+  if (state.planStatus !== 'ready') { list.innerHTML = `<div class="empty-state"><strong>先把需求说清楚</strong><p>${state.planStatus === 'idle' ? '输入自然语言并解析意图后，才会按真实数据筛选。' : '有关键含义待澄清或数据能力不足。请回答上方问题或调整原意；条件草案尚未作为完整需求执行。'}</p></div>`; return; }
   if (findConflicts(state.conditions).length || !state.conditions.length) { list.innerHTML = `<div class="empty-state"><strong>尚不能执行筛选</strong><p>请解决冲突，或至少添加一条可执行条件。</p></div>`; return; }
   if (state.tab === 'compare') { list.innerHTML = renderCompare(); return; }
   const search = $('#stock-search').value.trim().toLowerCase();
@@ -214,6 +221,7 @@ function renderResults() {
 function rawText(raw) {
   if (!raw) return '无原始字段';
   if ('currentField' in raw) return `${raw.currentField}: ${num(raw.current, 2)} ${esc(raw.currency || 'CNY')}；同期 ${raw.priorField}: ${num(raw.prior, 2)} ${esc(raw.currency || 'CNY')}`;
+  if ('years' in raw) return `${raw.field}: ${raw.years.map(row => `${esc(row.fiscalYear)} 年 ${num(row.value, 2)} ${esc(raw.currency || 'CNY')}（披露 ${esc(row.published || '—')}）`).join('；')}`;
   if ('field' in raw) return `${raw.field}: ${num(raw.value, 3)}`;
   return `close_price: ${raw.pricePoints || 0} 个交易日数据；${raw.adjust || ''} 复权`;
 }
@@ -289,16 +297,20 @@ async function interpret(followUp = false) {
     state.unsupported = result.unsupported || [];
     state.clarifications = result.clarifications || [];
     state.assumptions = result.assumptions || [];
+    state.requirements = result.requirements || [];
+    state.blockers = result.blockers || [];
+    state.planStatus = result.status === 'ready' ? 'ready' : 'needs_clarification';
+    state.previousPass = null;
     renderClarify();
     $('#clarify-input').value = '';
     if (!result.conditions.length) {
       state.conditions = [];
       execute();
-      $('#interpret-status').textContent = '没有识别出可由当前 5 个指标执行的条件。请修改描述或手动添加条件。';
+      $('#interpret-status').textContent = '当前没有可执行的完整条件，请补充或调整意图。';
       return;
     }
     state.conditions = result.conditions;
-    $('#interpret-status').textContent = `DeepSeek 已理解 ${followUps.length ? '补充后的' : ''}意图，生成 ${result.conditions.length} 条条件草案。请核对阈值。`;
+    $('#interpret-status').textContent = state.planStatus === 'ready' ? `已逐项核对意图，生成 ${result.conditions.length} 条可编辑条件。` : '已有条件草案，但完整意图尚未确认；请先回答澄清问题，不会提前展示候选股票。';
     execute();
     if (!followUp) $('#conditions').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (error) { if (/请先注册或登录/.test(error.message)) return showAuth(); $('#interpret-status').textContent = error.message; toast('AI 暂不可用，可手动修改当前条件'); }
@@ -306,9 +318,16 @@ async function interpret(followUp = false) {
 }
 
 $('#interpret-btn').addEventListener('click', () => interpret(false));
+$('#intent-input').addEventListener('input', () => {
+  if (state.planStatus === 'idle') return;
+  state.planStatus = 'idle'; state.requirements = []; state.blockers = [];
+  state.previousPass = null;
+  $('#interpret-status').textContent = '原始意图已修改，请重新解析后再筛选。';
+  execute();
+});
 $('#clarify-submit').addEventListener('click', () => interpret(true));
 $('#clarify-input').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); interpret(true); } });
-document.querySelectorAll('.example').forEach(button => button.addEventListener('click', () => { $('#intent-input').value = button.dataset.prompt; $('#intent-input').focus(); }));
+document.querySelectorAll('.example').forEach(button => button.addEventListener('click', () => { $('#intent-input').value = button.dataset.prompt; $('#intent-input').dispatchEvent(new Event('input')); $('#intent-input').focus(); }));
 $('#condition-list').addEventListener('change', event => {
   const card = event.target.closest('.condition-card'); if (!card) return;
   const index = Number(card.dataset.index); const field = event.target.dataset.field;
@@ -323,7 +342,7 @@ $('#condition-list').addEventListener('click', event => {
   state.conditions.splice(Number(remove.dataset.remove), 1); execute();
 });
 $('#add-condition').addEventListener('click', () => { if (state.conditions.length >= 8) return toast('最多支持 8 条条件'); state.conditions.push({ metric: 'revenue_yoy', op: 'gte', value: 0, label: '用户添加' }); execute(); });
-$('#reset-conditions').addEventListener('click', () => { state.conditions = structuredClone(DEFAULTS); state.assumptions = ['示例阈值均可修改；PE TTM 范围与年化波动率不是统一投资标准。']; state.unsupported = []; state.clarifications = []; execute(); toast('已恢复示例条件'); });
+$('#reset-conditions').addEventListener('click', () => { $('#intent-input').value = '经营改善、估值合理、走势相对稳定'; state.intentBase = ''; state.followUps = []; $('#clarify-panel').hidden = true; state.conditions = structuredClone(DEFAULTS); state.assumptions = ['示例阈值均可修改；PE TTM 范围与年化波动率不是统一投资标准。']; state.unsupported = []; state.clarifications = []; state.requirements = []; state.blockers = []; state.planStatus = 'ready'; execute(); toast('已切换到示例条件；结果只反映这五项示例条件'); });
 $('#refresh-data').addEventListener('click', () => loadMarket(true));
 document.querySelectorAll('.tab').forEach(button => button.addEventListener('click', () => { state.tab = button.dataset.tab; document.querySelectorAll('.tab').forEach(tab => { tab.classList.toggle('active', tab === button); tab.setAttribute('aria-selected', String(tab === button)); }); renderResults(); }));
 $('#stock-search').addEventListener('input', renderResults);
@@ -338,7 +357,7 @@ $('#result-list').addEventListener('change', event => {
 $('#close-dialog').addEventListener('click', () => $('#stock-dialog').close());
 $('#stock-dialog').addEventListener('click', event => { if (event.target === $('#stock-dialog')) $('#stock-dialog').close(); });
 $('#save-strategy').addEventListener('click', async () => {
-  if (!state.conditions.length || findConflicts(state.conditions).length) return toast('请先保留至少一条无冲突条件');
+  if (state.planStatus !== 'ready' || !state.conditions.length || findConflicts(state.conditions).length) return toast('请先澄清意图并保留无冲突条件');
   try {
     const text = $('#intent-input').value.trim();
     const response = await fetch('/api/strategies', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: text.slice(0, 60) || '手动筛选策略', text, conditions: state.conditions, assumptions: state.assumptions }) });
@@ -368,7 +387,7 @@ $('#strategy-list').addEventListener('click', async event => {
     if (!saved) return;
     state.conditions = saved.conditions.filter(c => FIELDS[c.metric] && OPERATORS[c.op]).slice(0, 8);
     state.assumptions = saved.assumptions || [];
-    state.unsupported = []; state.clarifications = [];
+    state.unsupported = []; state.clarifications = []; state.requirements = []; state.blockers = []; state.planStatus = 'ready';
     $('#intent-input').value = saved.text || '';
     $('#strategies-dialog').close(); execute();
     toast('已按当前市场数据重新执行保存的条件');

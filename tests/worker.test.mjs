@@ -16,12 +16,15 @@ const bars = Array.from({ length: 25 }, (_, index) => ({ date_ms: Date.UTC(2026,
 const income = thscode => ({ thscode, timestamp: Date.now(), item: [
   { fiscal_year: 2026, fiscal_period: 'Q3', period_end_ms: Date.UTC(2026, 8, 29, 16), report_date_ms: Date.UTC(2026, 9, 30), operating_income: 120, parent_holder_net_profit: 22, currency: 'CNY' },
   { fiscal_year: 2025, fiscal_period: 'Q3', period_end_ms: Date.UTC(2025, 8, 29, 16), report_date_ms: Date.UTC(2025, 9, 30), operating_income: 100, parent_holder_net_profit: 20, currency: 'CNY' },
+  { fiscal_year: 2025, fiscal_period: 'Q4', period_end_ms: Date.UTC(2025, 11, 30, 16), report_date_ms: Date.UTC(2026, 3, 30), operating_income: 150, parent_holder_net_profit: 25, currency: 'CNY' },
+  { fiscal_year: 2024, fiscal_period: 'Q4', period_end_ms: Date.UTC(2024, 11, 30, 16), report_date_ms: Date.UTC(2025, 3, 30), operating_income: 140, parent_holder_net_profit: 23, currency: 'CNY' },
+  { fiscal_year: 2023, fiscal_period: 'Q4', period_end_ms: Date.UTC(2023, 11, 30, 16), report_date_ms: Date.UTC(2024, 3, 30), operating_income: 135, parent_holder_net_profit: 21, currency: 'CNY' },
 ] });
 
 function fakeFetch({ failedIncome = false, missingValuation = false } = {}) {
   return async (input, options = {}) => {
     const url = new URL(input);
-    if (url.hostname === 'api.deepseek.com') return new Response(JSON.stringify({ model: 'mock-model', choices: [{ message: { content: JSON.stringify({ conditions: [{ metric: 'revenue_yoy', op: 'gt', value: 0 }, { metric: 'made_up', op: 'gt', value: 1 }], assumptions: ['测试假设'], unsupported: ['未来股价'], clarifications: [] }) } }] }), { status: 200 });
+    if (url.hostname === 'api.deepseek.com') return new Response(JSON.stringify({ model: 'mock-model', choices: [{ message: { content: JSON.stringify({ requirements: [{ text: '经营改善', status: 'mapped', reason: '营收同比', metrics: ['revenue_yoy'] }, { text: '未来一定涨', status: 'unsupported', reason: '未来无法保证', metrics: [] }], conditions: [{ metric: 'revenue_yoy', op: 'gt', value: 0 }, { metric: 'made_up', op: 'gt', value: 1 }], assumptions: ['测试假设'], unsupported: ['未来股价'], clarifications: [] }) } }] }), { status: 200 });
     const batch = (url.searchParams.get('thscodes') || '').split(',').filter(Boolean);
     let data;
     if (url.pathname.endsWith('/ths-stock-list')) data = { timestamp: Date.now(), item: universe };
@@ -52,6 +55,8 @@ test('market route returns 50 traceable stocks and preserves null valuation', as
     assert.equal(body.stocks[0].metrics.revenue_yoy.raw.currentField, 'operating_income');
     assert.equal(body.stocks[0].metrics.revenue_yoy.source.requestId, 'test-request');
     assert.equal(body.stocks[0].metrics.revenue_yoy.source.reportEnd, '2026-09-30');
+    assert.equal(body.stocks[0].metrics.profitable_years_3y.value, 3);
+    assert.deepEqual(body.stocks[0].metrics.profitable_years_3y.raw.years.map(row => row.fiscalYear), [2025, 2024, 2023]);
     const cached = await DB.prepare('SELECT data_json, lease_until FROM market_cache WHERE id = 1').first();
     assert.equal(cached.lease_until, 0);
     assert.equal(JSON.parse(cached.data_json).stocks.length, 50);
@@ -119,6 +124,7 @@ test('AI interpretation only accepts supported metrics and reports unsupported i
     assert.equal(response.status, 200);
     assert.deepEqual(body.conditions.map(item => item.metric), ['revenue_yoy']);
     assert.deepEqual(body.unsupported, ['未来股价']);
+    assert.equal(body.status, 'needs_clarification');
   } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -129,13 +135,15 @@ test('AI receives the original intent together with a follow-up clarification', 
     const message = JSON.parse(JSON.parse(options.body).messages.at(-1).content);
     assert.equal(message.originalIntent, '估值合理');
     assert.deepEqual(message.userFollowUps, ['PE 不超过 25 倍']);
-    return new Response(JSON.stringify({ model: 'mock-model', choices: [{ message: { content: JSON.stringify({ conditions: [{ metric: 'pe_ttm', op: 'lte', value: 25 }], assumptions: [], unsupported: [], clarifications: [] }) } }] }), { status: 200 });
+    return new Response(JSON.stringify({ model: 'mock-model', choices: [{ message: { content: JSON.stringify({ requirements: [{ text: 'PE 不超过 25 倍', status: 'mapped', reason: '明确阈值', metrics: ['pe_ttm'] }], conditions: [{ metric: 'pe_ttm', op: 'lte', value: 25 }], assumptions: [], unsupported: [], clarifications: [] }) } }] }), { status: 200 });
   };
   try {
     const { DB, cookie } = await signedIn();
     const response = await worker.fetch(new Request('https://example.test/api/interpret', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ text: '估值合理', followUps: ['PE 不超过 25 倍'] }) }), { DB, DEEPSEEK_API_KEY: 'test' });
     assert.equal(response.status, 200);
-    assert.equal((await response.json()).conditions[0].value, 25);
+    const result = await response.json();
+    assert.equal(result.conditions[0].value, 25);
+    assert.equal(result.status, 'ready');
   } finally { globalThis.fetch = originalFetch; }
 });
 

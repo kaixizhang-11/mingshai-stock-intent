@@ -5,7 +5,8 @@ const engine = __ENGINE__;
 
 const BASE = 'https://fuyao.aicubes.cn';
 const UNIVERSE = '000016.SH';
-const METRICS = new Set(['revenue_yoy', 'profit_yoy', 'pe_ttm', 'pb_mrq', 'volatility_20d']);
+__INTENT__
+const METRICS = EXECUTABLE_METRICS;
 __ACCOUNT__
 let marketCache = null;
 let marketPromise = null;
@@ -105,6 +106,12 @@ function normalize(universe, snapshotResult, valuationResult, incomeGroups, pric
     const rows = (incomeGroup?.item || []).filter(row => row?.period_end_ms && row?.report_date_ms && row.report_date_ms <= Date.now()).sort((a, b) => b.period_end_ms - a.period_end_ms);
     const latest = rows[0] || null;
     const comparable = latest ? rows.find(row => row.fiscal_year === latest.fiscal_year - 1 && row.fiscal_period === latest.fiscal_period) : null;
+    const annual = rows.filter(row => (row.fiscal_period === 'FY' || row.fiscal_period === 'Q4') && row.report_date_ms <= Date.now());
+    const completedYears = annual.slice(0, 3);
+    const profitableYears = completedYears.length === 3 &&
+      completedYears[0].fiscal_year - completedYears[2].fiscal_year === 2 &&
+      completedYears.every(row => validNumber(row.parent_holder_net_profit) !== null)
+      ? completedYears.filter(row => validNumber(row.parent_holder_net_profit) > 0).length : null;
     const valuation = valuations.get(code);
     const history = histories.get(code);
     const bars = (history?.item || []).filter(row => row?.date_ms && row.date_ms <= Date.now()).sort((a, b) => a.date_ms - b.date_ms);
@@ -137,6 +144,13 @@ function normalize(universe, snapshotResult, valuationResult, incomeGroups, pric
         profit_yoy: metric(growth(latest?.parent_holder_net_profit, comparable?.parent_holder_net_profit), '%', incomeSource, {
           raw: { currentField: 'parent_holder_net_profit', current: validNumber(latest?.parent_holder_net_profit), priorField: 'parent_holder_net_profit', prior: validNumber(comparable?.parent_holder_net_profit), currency: latest?.currency || 'CNY' },
         }),
+        profitable_years_3y: metric(profitableYears, '年', {
+          provider: '扶摇金融数据', endpoint: '/api/a-share/financials/income-statements-batch',
+          requestId: incomeGroup?._requestId || null,
+          reportEnd: date(completedYears[0]?.period_end_ms),
+          published: date(completedYears[0]?.report_date_ms),
+          method: '最近三个连续已披露完整会计年度，逐年检查归母净利润 > 0；年度不足或不连续时记为缺失',
+        }, { raw: { field: 'parent_holder_net_profit', years: completedYears.map(row => ({ fiscalYear: row.fiscal_year, value: validNumber(row.parent_holder_net_profit), published: date(row.report_date_ms) })), currency: latest?.currency || 'CNY' } }),
         pe_ttm: metric(valuation?.pe_ttm, '倍', valuationSource, { raw: { field: 'pe_ttm', value: validNumber(valuation?.pe_ttm) } }),
         pb_mrq: metric(valuation?.pb_mrq, '倍', valuationSource, { raw: { field: 'pb_mrq', value: validNumber(valuation?.pb_mrq) } }),
         volatility_20d: metric(volatility(bars), '%', historySource, { raw: { closeField: 'close_price', pricePoints: bars.length, adjust: 'forward', interval: '1d' } }),
@@ -157,7 +171,7 @@ async function loadMarket(env) {
   const jobs = [
     { type: 'snapshot', codes, path: '/api/a-share/prices/snapshot', params: { thscodes: codes.join(',') } },
     { type: 'valuation', codes, path: '/api/a-share/valuations/snapshot', params: { thscodes: codes.join(',') } },
-    ...batches.map(batch => ({ type: 'income', codes: batch, path: '/api/a-share/financials/income-statements-batch', params: { thscodes: batch.join(','), period: 'quarterly', limit: 12 } })),
+    ...batches.map(batch => ({ type: 'income', codes: batch, path: '/api/a-share/financials/income-statements-batch', params: { thscodes: batch.join(','), period: 'quarterly', limit: 16 } })),
     ...batches.map(batch => ({ type: 'history', codes: batch, path: '/api/a-share/prices/historical-batch', params: { thscodes: batch.join(','), interval: '1d', adjust: 'forward', start: priceStart, end: priceEnd } })),
   ];
   const done = await limitedMap(jobs, 4, job => fuyao(env, job.path, job.params, 25000));
@@ -179,6 +193,7 @@ async function loadMarket(env) {
     if (job.type === 'history') priceGroups.push(...(value.data.item || []).map(group => ({ ...group, _requestId: value.requestId })));
   });
   return {
+    schemaVersion: 2,
     universe: '上证50', universeCode: UNIVERSE, universeCount: universe.length,
     universeAsOf: date(universeResult.data.timestamp), fetchedAt: new Date().toISOString(),
     stocks: normalize(universe, snapshotResult, valuationResult, incomeGroups, priceGroups, issues),
@@ -222,30 +237,24 @@ async function interpret(request, env) {
   const followUps = (Array.isArray(body.followUps) ? body.followUps : []).slice(0, 3).map(item => String(item).trim().slice(0, 200)).filter(Boolean);
   if (!text) return json({ error: '请输入选股意图' }, 400);
   if (!env.DEEPSEEK_API_KEY) return json({ error: 'AI 解析服务尚未配置' }, 503);
-  const system = `你是选股意图理解与澄清助手，只输出 JSON 对象，不输出股票、预测、买卖建议。股票池固定上证50。允许的 metric 仅有 revenue_yoy（营业收入同比增长率%）、profit_yoy（归母净利润同比增长率%）、pe_ttm（市盈率TTM倍）、pb_mrq（市净率MRQ倍）、volatility_20d（近20交易日年化波动率%）。每个 condition 为 {"metric":"...","op":"gte|lte|gt|lt|between","value":数值,"max":数值可选,"label":"简短中文解释"}。你会收到原始意图及后续补充，后续补充可修正原始描述；需综合理解，而不是只解析最后一句。模糊的经营改善默认 revenue_yoy>0 且 profit_yoy>0；估值合理默认两条条件 pe_ttm>0 与 pe_ttm<=30，并在 assumptions 中说明这只是用户可改的工作假设；走势稳定默认 volatility_20d<=30，同样说明假设。若用户给出明确阈值，按阈值。不能由这5个字段表达的要求放入 unsupported，绝不悄悄忽略。重要信息不足、含义含糊或语义冲突时，在 clarifications 中提出最多两个简短、可回答的问题；冲突条件仍保留供用户检查。输出键：conditions 数组、assumptions 字符串数组、unsupported 字符串数组、clarifications 字符串数组。最多8条条件。`;
+  const system = `你是投资研究意图分析员，只输出严格 JSON；不输出股票名单、收益保证、涨跌预测或买卖建议。用户的原句与补充必须一起理解，后续补充可修正原句。股票池目前仅上证50。先把原意拆成 requirements，每项必须有 text（用户的子需求）、status（mapped/clarify/unsupported）、reason（为何这样处理）、metrics（mapped 时对应的指标 ID 数组）。用户每一项都必须有去向，不可只处理方便的部分。允许指标只有 revenue_yoy(营收同比%)、profit_yoy(归母净利润同比%)、profitable_years_3y(最近三个完整年度中归母净利润为正的年数，0-3年)、pe_ttm(市盈率倍)、pb_mrq(市净率倍)、volatility_20d(最近20交易日年化价格波动率%)。持续盈利可用 profitable_years_3y>=3；这不代表投资赚钱。"稳定赚钱"可能是企业持续盈利、股价低波动、稳定分红或未来收益保证；必须先问清楚，不得自行选一种并执行。"经营改善"可提出营收与利润同比为正的可修改假设；"估值合理"可提出 PE>0 且 PE<=30 的可修改假设；"走势稳定"可提出波动率<=30 的可修改假设，但都要标注 assumptions。没有数据的行业、现金流、分红、新闻、全A股、收益保证等必须放 unsupported 或 clarifications，不能拿别的指标偷换。条件必须为 {"metric":"白名单ID","op":"gte|lte|gt|lt|between","value":数字,"max":数字可选,"label":"中文"}，最多8条。输出键：requirements 数组、conditions 数组、assumptions 字符串数组、unsupported 字符串数组、clarifications 字符串数组。冲突条件如实保留供引擎识别。问句最多2条，一次问最影响执行的问题。`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 22000);
   try {
     const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST', signal: controller.signal,
       headers: { authorization: `Bearer ${env.DEEPSEEK_API_KEY}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'deepseek-chat', temperature: 0, max_tokens: 900, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: JSON.stringify({ originalIntent: text, userFollowUps: followUps }) }] }),
+      body: JSON.stringify({ model: 'deepseek-chat', temperature: 0, max_tokens: 1400, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: JSON.stringify({ originalIntent: text, userFollowUps: followUps }) }] }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(`模型接口返回 ${response.status}`);
     const parsed = JSON.parse(result.choices?.[0]?.message?.content || '{}');
-    const conditions = (Array.isArray(parsed.conditions) ? parsed.conditions : []).slice(0, 8).filter(item => {
-      return item && METRICS.has(item.metric) && ['gte', 'lte', 'gt', 'lt', 'between'].includes(item.op) && Number.isFinite(item.value) && (item.op !== 'between' || Number.isFinite(item.max));
-    }).flatMap(item => item.metric === 'pe_ttm' && item.op === 'between' && item.value === 0
-      ? [{ metric: 'pe_ttm', op: 'gt', value: 0, label: '市盈率为正' }, { metric: 'pe_ttm', op: 'lte', value: item.max, label: String(item.label || '').slice(0, 80) }]
-      : [{ metric: item.metric, op: item.op, value: item.value, ...(item.op === 'between' ? { max: item.max } : {}), label: String(item.label || '').slice(0, 80) }]).slice(0, 8);
-    return json({ conditions, assumptions: stringList(parsed.assumptions), unsupported: stringList(parsed.unsupported), clarifications: stringList(parsed.clarifications), model: result.model || 'deepseek-chat' });
+    const plan = validateIntent(parsed, text, followUps);
+    return json({ ...plan, model: result.model || 'deepseek-chat' });
   } catch (error) {
     return json({ error: `AI 解析失败：${error?.message || '未知错误'}` }, 502);
   } finally { clearTimeout(timer); }
 }
-
-function stringList(value) { return (Array.isArray(value) ? value : []).slice(0, 8).map(item => String(item).slice(0, 160)); }
 
 export default {
   async fetch(request, env) {
@@ -271,13 +280,15 @@ export default {
           if (!await rateLimit(db(env), `refresh:${user.id}`, 2, 3600000)) return json({ error: '本小时刷新次数已达上限，请稍后重试' }, 429);
           marketCache = null;
         }
-        if (!refresh && marketCache && Date.now() - marketCache.time < 15 * 60 * 1000) return json({ ...marketCache.data, cache: 'memory' });
+        if (!refresh && marketCache?.data?.schemaVersion === 2 && Date.now() - marketCache.time < 15 * 60 * 1000) return json({ ...marketCache.data, cache: 'memory' });
         if (!refresh) {
           const cached = await db(env).prepare('SELECT data_json, fetched_at FROM market_cache WHERE id = 1').first();
           if (cached && Date.now() - cached.fetched_at < 15 * 60 * 1000) {
             const data = JSON.parse(cached.data_json);
-            marketCache = { data, time: cached.fetched_at };
-            return json({ ...data, cache: 'database' });
+            if (data.schemaVersion === 2) {
+              marketCache = { data, time: cached.fetched_at };
+              return json({ ...data, cache: 'database' });
+            }
           }
         }
         if (!marketPromise) marketPromise = loadSharedMarket(env).finally(() => { marketPromise = null; });

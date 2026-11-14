@@ -4,6 +4,7 @@ const METRIC_NAMES = {
   pe_ttm: '市盈率 TTM',
   pb_mrq: '市净率 MRQ',
   volatility_20d: '20 日年化波动率',
+  profitable_years_3y: '近 3 年盈利年数',
 };
 
 export function findConflicts(conditions) {

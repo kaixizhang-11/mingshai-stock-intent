@@ -12,5 +12,6 @@ for (const [token, file] of [
   server = server.replace(token, JSON.stringify(readFileSync(resolve(root, file), 'utf8')));
 }
 server = server.replace('__ACCOUNT__', readFileSync(resolve(root, 'src/account.js'), 'utf8'));
+server = server.replace('__INTENT__', readFileSync(resolve(root, 'src/intent.js'), 'utf8').replace(/export (const|function) /g, '$1 '));
 writeFileSync(resolve(root, 'worker/index.js'), server);
 console.log('Generated worker/index.js');
