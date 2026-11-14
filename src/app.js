@@ -120,7 +120,7 @@ function renderConditions() {
   unsupportedBox.innerHTML = `<strong>当前数据无法执行：</strong>${state.unsupported.map(esc).join('；')}。这些要求未被静默纳入筛选。`;
   const coverage = $('#intent-coverage');
   coverage.hidden = state.requirements.length === 0 && state.blockers.length === 0;
-  coverage.innerHTML = `<strong>需求覆盖检查 · ${state.planStatus === 'ready' ? '可以执行' : '尚不能按完整意图筛选'}</strong>${state.requirements.map(item => `<div class="coverage-item"><span class="coverage-tag ${esc(item.status)}">${item.status === 'mapped' ? '已映射' : item.status === 'clarify' ? '待澄清' : '数据不足'}</span><span>${esc(item.text)}<small>${esc(item.reason)}</small></span></div>`).join('')}${state.blockers.length ? `<p class="coverage-blocker">${state.blockers.map(esc).join('；')}</p>` : ''}`;
+  coverage.innerHTML = `<strong>需求覆盖检查 · ${state.planStatus === 'ready' ? '可以执行' : '尚不能按完整意图筛选'}</strong>${state.requirements.map(item => `<div class="coverage-item"><span class="coverage-tag ${esc(item.status)}">${item.status === 'mapped' ? '已映射' : item.status === 'clarify' ? '待澄清' : item.status === 'context' ? '背景约束' : '数据不足'}</span><span>${esc(item.text)}<small>${esc(item.reason)}</small></span></div>`).join('')}${state.blockers.length ? `<p class="coverage-blocker">${state.blockers.map(esc).join('；')}</p>` : ''}`;
   const conflicts = findConflicts(state.conditions);
   const conflictBox = $('#conflicts');
   conflictBox.hidden = conflicts.length === 0;

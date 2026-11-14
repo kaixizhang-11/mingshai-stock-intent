@@ -15,8 +15,9 @@ export function validateIntent(raw, original, followUps = []) {
       ...(c.op === 'between' ? { max: c.max } : {}), label: String(c.label || '').slice(0, 80) }));
   const list = value => (Array.isArray(value) ? value : []).slice(0, 8).map(x => String(x).slice(0, 160)).filter(Boolean);
   const requirements = (Array.isArray(raw?.requirements) ? raw.requirements : []).slice(0, 8)
-    .filter(r => r && typeof r.text === 'string' && ['mapped', 'clarify', 'unsupported'].includes(r.status))
-    .map(r => ({ text: r.text.slice(0, 120), status: r.status,
+    .filter(r => r && typeof r.text === 'string' && ['mapped', 'clarify', 'unsupported', 'context'].includes(r.status))
+    .map(r => ({ text: r.text.slice(0, 120), status: r.status === 'mapped' &&
+      /^(?:我)?(?:不要求|无需|不需要|不追求).{0,12}(?:未来)?(?:收益保证|保证收益|收益承诺|涨跌预测)/.test(r.text) ? 'context' : r.status,
       reason: String(r.reason || '').slice(0, 160),
       metrics: (Array.isArray(r.metrics) ? r.metrics : []).filter(x => EXECUTABLE_METRICS.has(x)) }));
   const clarifications = list(raw?.clarifications);
@@ -24,7 +25,7 @@ export function validateIntent(raw, original, followUps = []) {
   const assumptions = list(raw?.assumptions);
   const reasons = [];
   if (!requirements.length) reasons.push('AI 未给出逐项需求覆盖表，不能确认是否理解完整。');
-  if (requirements.some(r => r.status !== 'mapped')) reasons.push('有需求尚未转成可执行条件。');
+  if (requirements.some(r => r.status !== 'mapped' && r.status !== 'context')) reasons.push('有需求尚未转成可执行条件。');
   if (clarifications.length) reasons.push('用户意图仍有待澄清的问题。');
   if (unsupported.length) reasons.push('当前数据能力未覆盖全部需求。');
   if (requirements.some(r => r.status === 'mapped' && (!r.metrics.length || r.metrics.some(m => !conditions.some(c => c.metric === m))))) reasons.push('需求与实际条件未逐项对应。');
