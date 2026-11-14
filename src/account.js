@@ -97,14 +97,24 @@ async function accountRoute(request, env, url) {
     if (!await rateLimit(database, `${path}:${identity}`, limit, path.endsWith('register') ? 3600000 : 900000)) return accountJson({ error: '尝试次数过多，请稍后再试' }, 429);
     if (path.endsWith('register')) {
       if (password.length < 12 || password.length > 128) return accountJson({ error: '密码长度须为 12–128 个字符' }, 400);
-      const existing = await database.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
-      if (existing) return accountJson({ error: '此邮箱已注册，请登录' }, 409);
-      const id = crypto.randomUUID();
-      const salt = base64(crypto.getRandomValues(new Uint8Array(16)));
-      const hash = await passwordHash(password, salt);
-      try { await database.prepare('INSERT INTO users (id, email, password_salt, password_hash, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, email, salt, hash, Date.now()).run(); }
-      catch { return accountJson({ error: '邮箱已注册或注册失败' }, 409); }
-      return accountJson({ user: { id, email } }, 201, { 'set-cookie': await createSession(database, id, request) });
+      let stage = 'lookup';
+      try {
+        const existing = await database.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+        if (existing) return accountJson({ error: '此邮箱已注册，请登录' }, 409);
+        stage = 'random';
+        const id = crypto.randomUUID();
+        const salt = base64(crypto.getRandomValues(new Uint8Array(16)));
+        stage = 'hash';
+        const hash = await passwordHash(password, salt);
+        stage = 'insert';
+        try { await database.prepare('INSERT INTO users (id, email, password_salt, password_hash, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, email, salt, hash, Date.now()).run(); }
+        catch { return accountJson({ error: '邮箱已注册或注册失败' }, 409); }
+        stage = 'session';
+        return accountJson({ user: { id, email } }, 201, { 'set-cookie': await createSession(database, id, request) });
+      } catch (error) {
+        console.error('MINGSHAI_REGISTER_ERROR', stage, error?.name || 'Error', error?.message || 'unknown');
+        return accountJson({ error: '注册服务暂不可用', code: `register_${stage}` }, 503);
+      }
     }
     const user = await database.prepare('SELECT id, email, password_salt, password_hash FROM users WHERE email = ?').bind(email).first();
     const candidate = await passwordHash(password, user?.password_salt || base64(new Uint8Array(16)));
