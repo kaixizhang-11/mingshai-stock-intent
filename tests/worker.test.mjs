@@ -84,6 +84,23 @@ test('AI interpretation only accepts supported metrics and reports unsupported i
   } finally { globalThis.fetch = originalFetch; }
 });
 
+test('AI receives the original intent together with a follow-up clarification', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, options) => {
+    assert.equal(new URL(input).hostname, 'api.deepseek.com');
+    const message = JSON.parse(JSON.parse(options.body).messages.at(-1).content);
+    assert.equal(message.originalIntent, '估值合理');
+    assert.deepEqual(message.userFollowUps, ['PE 不超过 25 倍']);
+    return new Response(JSON.stringify({ model: 'mock-model', choices: [{ message: { content: JSON.stringify({ conditions: [{ metric: 'pe_ttm', op: 'lte', value: 25 }], assumptions: [], unsupported: [], clarifications: [] }) } }] }), { status: 200 });
+  };
+  try {
+    const { DB, cookie } = await signedIn();
+    const response = await worker.fetch(new Request('https://example.test/api/interpret', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ text: '估值合理', followUps: ['PE 不超过 25 倍'] }) }), { DB, DEEPSEEK_API_KEY: 'test' });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).conditions[0].value, 25);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('missing data credential fails visibly', async () => {
   const { DB, cookie } = await signedIn();
   const response = await worker.fetch(new Request('https://example.test/api/market?refresh=1', { headers: { cookie } }), { DB });

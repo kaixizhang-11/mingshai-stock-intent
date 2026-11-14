@@ -191,16 +191,17 @@ async function loadMarket(env) {
 async function interpret(request, env) {
   const body = await request.json().catch(() => ({}));
   const text = typeof body.text === 'string' ? body.text.trim().slice(0, 500) : '';
+  const followUps = (Array.isArray(body.followUps) ? body.followUps : []).slice(0, 3).map(item => String(item).trim().slice(0, 200)).filter(Boolean);
   if (!text) return json({ error: '请输入选股意图' }, 400);
   if (!env.DEEPSEEK_API_KEY) return json({ error: 'AI 解析服务尚未配置' }, 503);
-  const system = `你是选股条件翻译器，只输出 JSON 对象，不输出股票、预测、买卖建议。股票池固定上证50。允许的 metric 仅有 revenue_yoy（营业收入同比增长率%）、profit_yoy（归母净利润同比增长率%）、pe_ttm（市盈率TTM倍）、pb_mrq（市净率MRQ倍）、volatility_20d（近20交易日年化波动率%）。每个 condition 为 {"metric":"...","op":"gte|lte|gt|lt|between","value":数值,"max":数值可选,"label":"简短中文解释"}。模糊的经营改善默认 revenue_yoy>0 且 profit_yoy>0；估值合理默认两条条件 pe_ttm>0 与 pe_ttm<=30，并在 assumptions 中说明这只是用户可改的工作假设；走势稳定默认 volatility_20d<=30，同样说明假设。若用户给出明确阈值，按阈值。不能由这5个字段表达的要求放入 unsupported，绝不悄悄忽略。若语义冲突，仍保留原始条件并写入 clarifications。输出键：conditions 数组、assumptions 字符串数组、unsupported 字符串数组、clarifications 字符串数组。最多8条条件。`;
+  const system = `你是选股意图理解与澄清助手，只输出 JSON 对象，不输出股票、预测、买卖建议。股票池固定上证50。允许的 metric 仅有 revenue_yoy（营业收入同比增长率%）、profit_yoy（归母净利润同比增长率%）、pe_ttm（市盈率TTM倍）、pb_mrq（市净率MRQ倍）、volatility_20d（近20交易日年化波动率%）。每个 condition 为 {"metric":"...","op":"gte|lte|gt|lt|between","value":数值,"max":数值可选,"label":"简短中文解释"}。你会收到原始意图及后续补充，后续补充可修正原始描述；需综合理解，而不是只解析最后一句。模糊的经营改善默认 revenue_yoy>0 且 profit_yoy>0；估值合理默认两条条件 pe_ttm>0 与 pe_ttm<=30，并在 assumptions 中说明这只是用户可改的工作假设；走势稳定默认 volatility_20d<=30，同样说明假设。若用户给出明确阈值，按阈值。不能由这5个字段表达的要求放入 unsupported，绝不悄悄忽略。重要信息不足、含义含糊或语义冲突时，在 clarifications 中提出最多两个简短、可回答的问题；冲突条件仍保留供用户检查。输出键：conditions 数组、assumptions 字符串数组、unsupported 字符串数组、clarifications 字符串数组。最多8条条件。`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 22000);
   try {
     const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST', signal: controller.signal,
       headers: { authorization: `Bearer ${env.DEEPSEEK_API_KEY}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'deepseek-chat', temperature: 0, max_tokens: 900, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: text }] }),
+      body: JSON.stringify({ model: 'deepseek-chat', temperature: 0, max_tokens: 900, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: JSON.stringify({ originalIntent: text, userFollowUps: followUps }) }] }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(`模型接口返回 ${response.status}`);
@@ -228,7 +229,7 @@ export default {
     if (!url.pathname.startsWith('/api/')) return new Response('Not found', { status: 404 });
     if (Number(request.headers.get('content-length') || 0) > 8192) return json({ error: '请求内容过大' }, 413);
     try {
-      if (url.pathname === '/api/session' || url.pathname.startsWith('/api/auth/') || url.pathname.startsWith('/api/strategies')) return await accountRoute(request, env, url);
+      if (url.pathname === '/api/session' || url.pathname === '/api/account' || url.pathname.startsWith('/api/auth/') || url.pathname.startsWith('/api/strategies')) return await accountRoute(request, env, url);
       const user = await currentUser(request, env);
       if (!user) return json({ error: '请先注册或登录账号' }, 401);
       if (url.pathname === '/api/interpret' && request.method === 'POST') {

@@ -19,7 +19,7 @@
     <header class="topbar">
       <a class="brand" href="#top" aria-label="明筛首页"><span class="brand-mark">明</span><span><strong>明筛</strong><small>INTENT → EVIDENCE</small></span></a>
       <nav class="topnav" aria-label="页面导航"><a href="#conditions">条件工作台</a><a href="#results">筛选结果</a><a href="#method">数据与边界</a></nav>
-      <div class="top-actions"><span class="live-dot"></span><span id="top-data-state">等待数据连接</span><span class="account-email" id="account-email"></span><button type="button" id="logout-btn" class="logout-btn">退出</button></div>
+      <div class="top-actions"><span class="live-dot"></span><span id="top-data-state">等待数据连接</span><span class="account-email" id="account-email"></span><button type="button" id="account-btn" class="logout-btn">账户</button><button type="button" id="logout-btn" class="logout-btn">退出</button></div>
     </header>
 
     <main id="top">
@@ -45,6 +45,7 @@
         <textarea id="intent-input" maxlength="500" placeholder="例如：经营改善、估值合理、走势相对稳定">经营改善、估值合理、走势相对稳定</textarea>
         <div class="input-bottom"><div class="examples"><span>试试：</span><button type="button" class="example" data-prompt="经营改善、估值合理、走势相对稳定">稳健经营</button><button type="button" class="example" data-prompt="营收同比增长超过10%，市盈率低于25倍">增长与估值</button><button type="button" class="example" data-prompt="市盈率高于40倍，同时低于20倍">冲突条件</button></div><button type="button" id="interpret-btn" class="primary-btn">解析选股意图 <span>→</span></button></div>
         <div id="interpret-status" class="interpret-status" role="status" aria-live="polite">AI 只翻译意图，不决定股票是否入选。</div>
+        <div id="clarify-panel" class="clarify-panel" hidden><strong>继续澄清你的意图</strong><div id="clarify-questions" class="clarify-questions"></div><div id="clarify-history" class="clarify-history"></div><div class="clarify-form"><label class="sr-only" for="clarify-input">补充条件或回答 AI 问题</label><input id="clarify-input" maxlength="200" placeholder="例如：合理估值改为 PE 不超过 25 倍"><button id="clarify-submit" type="button" class="outline-btn">补充并重新解析 →</button></div></div>
       </section>
 
       <div class="work-grid">
@@ -80,6 +81,7 @@
 
   <dialog id="stock-dialog" aria-labelledby="dialog-title"><div class="dialog-content"><button type="button" id="close-dialog" class="dialog-close" aria-label="关闭">×</button><div id="dialog-body"></div></div></dialog>
   <dialog id="strategies-dialog" aria-labelledby="strategies-title"><div class="dialog-content"><button type="button" id="close-strategies" class="dialog-close" aria-label="关闭">×</button><div class="section-index">MY RESEARCH</div><h2 id="strategies-title">我的策略</h2><p class="strategy-note">保存的是条件定义；重新打开时会用当前数据再执行一次。</p><div id="strategy-list" class="strategy-list"></div></div></dialog>
+  <dialog id="account-dialog" aria-labelledby="account-title"><div class="dialog-content"><button type="button" id="close-account" class="dialog-close" aria-label="关闭">×</button><div class="section-index">ACCOUNT</div><h2 id="account-title">账户与数据</h2><p class="strategy-note">账号下的策略保存在云端数据库。删除账号会一并删除策略与会话，操作无法撤销。</p><form id="delete-account-form" class="account-delete-form"><label for="delete-password">输入当前密码以删除账号</label><input id="delete-password" type="password" autocomplete="current-password" required placeholder="当前密码"><button type="submit" class="danger-btn">永久删除账号及策略</button><p id="account-error" class="auth-error" role="alert"></p></form></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

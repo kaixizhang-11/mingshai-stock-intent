@@ -15,7 +15,7 @@ const DEFAULTS = [
   { metric: 'pe_ttm', op: 'lte', value: 30, label: '估值合理暂按 PE TTM ≤ 30 倍' },
   { metric: 'volatility_20d', op: 'lte', value: 30, label: '稳定暂按近 20 日年化波动率 ≤ 30%' },
 ];
-const state = { user: null, market: null, conditions: structuredClone(DEFAULTS), assumptions: ['“估值合理”暂以 PE TTM 0–30 倍表达；“稳定”暂以 20 日年化波动率不超过 30% 表达。两项均为可修改的工作假设。'], unsupported: [], clarifications: [], tab: 'pass', results: [], compare: new Set(), previousPass: null, loading: false, strategies: [] };
+const state = { user: null, market: null, conditions: structuredClone(DEFAULTS), assumptions: ['“估值合理”暂以 PE TTM 0–30 倍表达；“稳定”暂以 20 日年化波动率不超过 30% 表达。两项均为可修改的工作假设。'], unsupported: [], clarifications: [], intentBase: '', followUps: [], tab: 'pass', results: [], compare: new Set(), previousPass: null, loading: false, strategies: [] };
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const num = (value, digits = 1) => typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(value) : '—';
@@ -30,9 +30,21 @@ function showAuth() {
   state.user = null;
   state.market = null;
   state.results = [];
+  state.conditions = structuredClone(DEFAULTS);
+  state.assumptions = [];
+  state.unsupported = [];
+  state.clarifications = [];
+  state.intentBase = '';
+  state.followUps = [];
+  state.compare.clear();
+  state.strategies = [];
+  state.previousPass = null;
+  $('#intent-input').value = '经营改善、估值合理、走势相对稳定';
+  $('#clarify-panel').hidden = true;
   $('#auth-screen').hidden = false;
   $('#app-shell').hidden = true;
   $('#auth-password').value = '';
+  renderConditions();
 }
 
 function showApp(user) {
@@ -69,6 +81,20 @@ $('#auth-form').addEventListener('submit', async event => {
 $('#logout-btn').addEventListener('click', async () => {
   try { await fetch('/api/auth/logout', { method: 'POST' }); }
   finally { showAuth(); }
+});
+$('#account-btn').addEventListener('click', () => { $('#account-error').textContent = ''; $('#delete-password').value = ''; $('#account-dialog').showModal(); });
+$('#close-account').addEventListener('click', () => $('#account-dialog').close());
+$('#account-dialog').addEventListener('click', event => { if (event.target === $('#account-dialog')) $('#account-dialog').close(); });
+$('#delete-account-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = event.target.querySelector('button[type=submit]'); button.disabled = true;
+  try {
+    const response = await fetch('/api/account', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: $('#delete-password').value }) });
+    const result = await response.json();
+    if (!response.ok || !result.deleted) throw new Error(result.error || '删除失败');
+    $('#account-dialog').close(); showAuth(); toast('账号和已保存策略已删除');
+  } catch (error) { $('#account-error').textContent = error.message; }
+  finally { button.disabled = false; }
 });
 
 function renderConditions() {
@@ -237,34 +263,48 @@ async function loadMarket(refresh = false) {
   } finally { state.loading = false; $('#refresh-data').disabled = false; }
 }
 
-async function interpret() {
-  const text = $('#intent-input').value.trim();
+function renderClarify() {
+  $('#clarify-panel').hidden = false;
+  $('#clarify-questions').innerHTML = state.clarifications.length ? `<strong>AI 待确认：</strong>${state.clarifications.map(esc).join('；')}` : '还想补充吗？你可以说明行业偏好、指标阈值，或修正刚才的表达。';
+  $('#clarify-history').textContent = state.followUps.length ? `已补充：${state.followUps.join(' → ')}` : '';
+}
+
+async function interpret(followUp = false) {
+  const text = followUp ? state.intentBase : $('#intent-input').value.trim();
   if (!text) { toast('请先输入选股意图'); return; }
-  const button = $('#interpret-btn'); button.disabled = true; $('#interpret-status').textContent = 'AI 正在把语言翻译为可检查条件…';
+  const reply = followUp ? $('#clarify-input').value.trim() : '';
+  if (followUp && !reply) return toast('请先输入补充说明');
+  if (followUp && state.followUps.length >= 3) return toast('最多补充三轮，请直接修改原始意图后重新解析');
+  const followUps = followUp ? [...state.followUps, reply] : [];
+  const button = followUp ? $('#clarify-submit') : $('#interpret-btn'); button.disabled = true; $('#interpret-status').textContent = 'DeepSeek 正在理解意图并生成可检查条件…';
   try {
-    const response = await fetch('/api/interpret', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
+    const response = await fetch('/api/interpret', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, followUps }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || '解析失败');
+    state.intentBase = text;
+    state.followUps = followUps;
+    state.unsupported = result.unsupported || [];
+    state.clarifications = result.clarifications || [];
+    state.assumptions = result.assumptions || [];
+    renderClarify();
+    $('#clarify-input').value = '';
     if (!result.conditions.length) {
-      state.unsupported = result.unsupported || [];
-      state.clarifications = result.clarifications || [];
-      state.assumptions = result.assumptions || [];
-      renderConditions();
+      state.conditions = [];
+      execute();
       $('#interpret-status').textContent = '没有识别出可由当前 5 个指标执行的条件。请修改描述或手动添加条件。';
       return;
     }
     state.conditions = result.conditions;
-    state.assumptions = result.assumptions || [];
-    state.unsupported = result.unsupported || [];
-    state.clarifications = result.clarifications || [];
-    $('#interpret-status').textContent = `已生成 ${result.conditions.length} 条条件草案。请核对阈值；AI 仅负责翻译，筛选结果由规则计算。`;
+    $('#interpret-status').textContent = `DeepSeek 已理解 ${followUps.length ? '补充后的' : ''}意图，生成 ${result.conditions.length} 条条件草案。请核对阈值。`;
     execute();
-    $('#conditions').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!followUp) $('#conditions').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (error) { if (/请先注册或登录/.test(error.message)) return showAuth(); $('#interpret-status').textContent = error.message; toast('AI 暂不可用，可手动修改当前条件'); }
   finally { button.disabled = false; }
 }
 
-$('#interpret-btn').addEventListener('click', interpret);
+$('#interpret-btn').addEventListener('click', () => interpret(false));
+$('#clarify-submit').addEventListener('click', () => interpret(true));
+$('#clarify-input').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); interpret(true); } });
 document.querySelectorAll('.example').forEach(button => button.addEventListener('click', () => { $('#intent-input').value = button.dataset.prompt; $('#intent-input').focus(); }));
 $('#condition-list').addEventListener('change', event => {
   const card = event.target.closest('.condition-card'); if (!card) return;

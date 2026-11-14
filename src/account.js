@@ -90,6 +90,7 @@ async function accountRoute(request, env, url) {
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return accountJson({ error: '请输入有效邮箱地址' }, 400);
+    if (password.length > 128) return accountJson({ error: '密码长度不能超过 128 个字符' }, 400);
     const ip = request.headers.get('cf-connecting-ip') || 'local';
     const identity = await sha256(`${ip}:${email}`);
     const limit = path.endsWith('register') ? 5 : 10;
@@ -117,6 +118,15 @@ async function accountRoute(request, env, url) {
     const token = request.headers.get('cookie')?.match(/(?:^|;\s*)ms_session=([^;]+)/)?.[1];
     if (token) await database.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256(token)).run();
     return accountJson({ ok: true }, 200, { 'set-cookie': clearCookie(request) });
+  }
+  if (path === '/api/account' && method === 'DELETE') {
+    const body = await request.json().catch(() => ({}));
+    const password = String(body.password || '');
+    if (!password || password.length > 128) return accountJson({ error: '请输入当前密码' }, 400);
+    const row = await database.prepare('SELECT password_salt, password_hash FROM users WHERE id = ?').bind(user.id).first();
+    if (!row || !equalBytes(await passwordHash(password, row.password_salt), row.password_hash)) return accountJson({ error: '密码不正确' }, 403);
+    await database.prepare('DELETE FROM users WHERE id = ?').bind(user.id).run();
+    return accountJson({ deleted: true }, 200, { 'set-cookie': clearCookie(request) });
   }
 
   if (path === '/api/strategies' && method === 'GET') {

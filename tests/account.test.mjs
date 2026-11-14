@@ -66,3 +66,19 @@ test('auth rejects weak passwords and cross-site writes', async () => {
   assert.equal(anonymous.status, 401);
   DB.close();
 });
+
+test('account deletion removes private strategies and invalidates session', async () => {
+  const DB = createLocalDb();
+  const cookie = await register(DB, 'delete@example.com');
+  const save = await worker.fetch(request('/api/strategies', 'POST', { conditions: [{ metric: 'pe_ttm', op: 'lte', value: 25 }] }, cookie), { DB });
+  assert.equal(save.status, 201);
+  const wrong = await worker.fetch(request('/api/account', 'DELETE', { password: 'wrong-password-123' }, cookie), { DB });
+  assert.equal(wrong.status, 403);
+  const deleted = await worker.fetch(request('/api/account', 'DELETE', { password }, cookie), { DB });
+  assert.equal(deleted.status, 200);
+  const session = await worker.fetch(request('/api/session', 'GET', null, cookie), { DB });
+  assert.equal((await session.json()).user, null);
+  const count = await DB.prepare('SELECT count(*) AS n FROM strategies').first();
+  assert.equal(count.n, 0);
+  DB.close();
+});
