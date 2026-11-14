@@ -1,0 +1,11 @@
+dist/
+site.tar.gz
+.deps/
+.local/
+.env*
+!.env.example
+scripts/probe_fuy.py
+scripts/sample_fuy.py
+scripts/run-runtime-check.py
+scripts/test-runtime.mjs
+scripts/run-dev.py

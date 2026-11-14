@@ -1,0 +1,410 @@
+const html = "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <meta name=\"description\" content=\"明筛：把自然语言选股意图转成可检查、可修改、可执行的上证50筛选条件。\">\n  <title>明筛 · 自然语言选股解释器</title>\n  <link rel=\"stylesheet\" href=\"/app.css\">\n  <script type=\"module\" src=\"/app.js\"></script>\n</head>\n<body>\n  <div class=\"ambient ambient-one\" aria-hidden=\"true\"></div>\n  <div class=\"ambient ambient-two\" aria-hidden=\"true\"></div>\n  <section id=\"auth-screen\" class=\"auth-screen\" aria-labelledby=\"auth-title\">\n    <div class=\"auth-intro\"><div class=\"brand\"><span class=\"brand-mark\">明</span><span><strong>明筛</strong><small>INTENT → EVIDENCE</small></span></div><div class=\"section-index\">AI STOCK RESEARCH WORKSPACE</div><h1>让每个选股想法<br><em>都有据可查。</em></h1><p>用自然语言提出意图，确认 AI 生成的条件，再用真实市场数据检查每只股票的入选、排除与缺失依据。</p><div class=\"auth-features\"><span>01 / DeepSeek 意图解析</span><span>02 / 扶摇金融数据</span><span>03 / 跨设备保存策略</span></div></div>\n    <div class=\"auth-card panel\"><div class=\"section-index\">YOUR RESEARCH ACCOUNT</div><h2 id=\"auth-title\">欢迎使用明筛</h2><p class=\"auth-subtitle\">注册或登录后开始研究；每位用户的策略独立保存。</p><div class=\"auth-tabs\"><button type=\"button\" class=\"auth-tab active\" data-auth-mode=\"login\">登录</button><button type=\"button\" class=\"auth-tab\" data-auth-mode=\"register\">注册账号</button></div><form id=\"auth-form\"><label for=\"auth-email\">邮箱</label><input id=\"auth-email\" type=\"email\" autocomplete=\"email\" required placeholder=\"name@example.com\" maxlength=\"254\"><label for=\"auth-password\">密码</label><input id=\"auth-password\" type=\"password\" autocomplete=\"current-password\" required minlength=\"12\" maxlength=\"128\" placeholder=\"至少 12 个字符\"><div id=\"password-hint\" class=\"password-hint\" hidden>使用至少 12 个字符。请保管好密码；当前版本尚无邮件找回功能。</div><button id=\"auth-submit\" type=\"submit\" class=\"primary-btn\">登录并开始研究 <span>→</span></button><div id=\"auth-error\" class=\"auth-error\" role=\"alert\" aria-live=\"polite\"></div></form><div class=\"auth-boundary\">研究工具仅展示可追溯数据与条件结果，不提供买卖建议或收益承诺。</div></div>\n  </section>\n  <div id=\"app-shell\" class=\"shell\" hidden>\n    <header class=\"topbar\">\n      <a class=\"brand\" href=\"#top\" aria-label=\"明筛首页\"><span class=\"brand-mark\">明</span><span><strong>明筛</strong><small>INTENT → EVIDENCE</small></span></a>\n      <nav class=\"topnav\" aria-label=\"页面导航\"><a href=\"#conditions\">条件工作台</a><a href=\"#results\">筛选结果</a><a href=\"#method\">数据与边界</a></nav>\n      <div class=\"top-actions\"><span class=\"live-dot\"></span><span id=\"top-data-state\">等待数据连接</span><span class=\"account-email\" id=\"account-email\"></span><button type=\"button\" id=\"logout-btn\" class=\"logout-btn\">退出</button></div>\n    </header>\n\n    <main id=\"top\">\n      <section class=\"hero\">\n        <div class=\"hero-copy\">\n          <div class=\"eyebrow\"><span class=\"line\"></span> FINANCIAL RESEARCH WORKSPACE <span class=\"edition\">01 / STOCK SCREENING</span></div>\n          <h1>把模糊想法，<br><em>变成看得见的条件。</em></h1>\n          <p>说出你的选股意图。AI 帮你翻译，筛选引擎按真实数据执行；每一只股票的入选、排除和数据缺口，都可以逐条核对。</p>\n          <div class=\"hero-points\"><span>上证 50 成分股</span><span>条件可编辑</span><span>结论有来源</span></div>\n        </div>\n        <div class=\"hero-side\" aria-label=\"产品工作流\">\n          <div class=\"side-kicker\">THE WORKFLOW</div>\n          <div class=\"flow-step\"><b>01</b><span><strong>表达意图</strong><small>自然语言输入</small></span><i>↗</i></div>\n          <div class=\"flow-step\"><b>02</b><span><strong>确认条件</strong><small>口径、阈值、冲突</small></span><i>↗</i></div>\n          <div class=\"flow-step\"><b>03</b><span><strong>核对结果</strong><small>入选、排除、缺失</small></span><i>↗</i></div>\n          <div class=\"side-foot\">AI 提议 · 规则计算 · 数据作证</div>\n        </div>\n      </section>\n\n      <section class=\"input-panel panel\" aria-labelledby=\"intent-title\">\n        <div class=\"panel-head\"><div><div class=\"section-index\">01 / 意图输入</div><h2 id=\"intent-title\">你想找什么样的公司？</h2></div><span class=\"small-label\">自然语言 → 条件草案</span></div>\n        <label class=\"sr-only\" for=\"intent-input\">输入选股意图</label>\n        <textarea id=\"intent-input\" maxlength=\"500\" placeholder=\"例如：经营改善、估值合理、走势相对稳定\">经营改善、估值合理、走势相对稳定</textarea>\n        <div class=\"input-bottom\"><div class=\"examples\"><span>试试：</span><button type=\"button\" class=\"example\" data-prompt=\"经营改善、估值合理、走势相对稳定\">稳健经营</button><button type=\"button\" class=\"example\" data-prompt=\"营收同比增长超过10%，市盈率低于25倍\">增长与估值</button><button type=\"button\" class=\"example\" data-prompt=\"市盈率高于40倍，同时低于20倍\">冲突条件</button></div><button type=\"button\" id=\"interpret-btn\" class=\"primary-btn\">解析选股意图 <span>→</span></button></div>\n        <div id=\"interpret-status\" class=\"interpret-status\" role=\"status\" aria-live=\"polite\">AI 只翻译意图，不决定股票是否入选。</div>\n      </section>\n\n      <div class=\"work-grid\">\n        <section id=\"conditions\" class=\"conditions-panel panel\" aria-labelledby=\"conditions-title\">\n          <div class=\"panel-head\"><div><div class=\"section-index\">02 / 条件工作台</div><h2 id=\"conditions-title\">让每个判断有明确口径</h2></div><span class=\"small-label\">可直接修改</span></div>\n          <div class=\"universe-line\"><div><span class=\"label\">筛选范围</span><strong>上证 50</strong><small>当前成分股 · 非全 A 股</small></div><div class=\"universe-count\"><strong id=\"universe-count\">—</strong><span>只股票</span></div></div>\n          <div id=\"assumptions\" class=\"assumptions\" hidden></div>\n          <div id=\"unsupported\" class=\"unsupported\" hidden></div>\n          <div id=\"conflicts\" class=\"conflicts\" hidden role=\"alert\"></div>\n          <div id=\"condition-list\" class=\"condition-list\"></div>\n          <div class=\"condition-actions\"><button type=\"button\" id=\"add-condition\" class=\"text-btn\">＋ 添加条件</button><button type=\"button\" id=\"reset-conditions\" class=\"text-btn subtle\">恢复示例</button></div>\n          <div class=\"engine-note\"><span class=\"engine-icon\">≡</span><p><strong>职责边界</strong><br>AI 生成条件草案；你决定阈值；筛选引擎只按当前数据和条件计算。无法取到的数据记为“待核查”，不会默认为通过。</p></div>\n        </section>\n\n        <aside class=\"insight-column\">\n          <section class=\"status-panel panel\"><div class=\"section-index\">DATA STATUS</div><h2>数据现场</h2><div id=\"data-status\" class=\"data-status\">正在连接扶摇金融数据…</div><dl class=\"data-meta\"><div><dt>成分范围</dt><dd id=\"universe-asof\">—</dd></div><div><dt>最近取数</dt><dd id=\"fetched-at\">—</dd></div><div><dt>数据接口</dt><dd>扶摇金融数据</dd></div></dl><div id=\"tool-footprint\" class=\"tool-footprint\"></div><button type=\"button\" id=\"refresh-data\" class=\"outline-btn\">刷新真实数据 <span>↗</span></button><div id=\"api-issues\" class=\"api-issues\" hidden></div></section>\n          <section class=\"lens-panel panel\"><div class=\"section-index\">THE LENS</div><h2>“合理”由你定义</h2><p>市盈率、利润增长和波动率都只是可核查的量化视角。跨行业比较会产生偏差；筛选结果是研究线索，不是收益预测。</p><div class=\"lens-rule\"><span>事实</span><span>计算</span><span>不确定性</span></div></section>\n        </aside>\n      </div>\n\n      <section id=\"results\" class=\"results-panel panel\" aria-labelledby=\"results-title\">\n        <div class=\"results-head\"><div><div class=\"section-index\">03 / 可解释结果</div><h2 id=\"results-title\">谁符合，谁不符合，为什么</h2><p id=\"result-subtitle\">数据载入后，会按当前条件确定性计算。</p></div><div class=\"result-actions\"><button type=\"button\" id=\"save-strategy\" class=\"outline-btn\">保存本次条件</button><button type=\"button\" id=\"load-strategy\" class=\"outline-btn\">读取已保存条件</button></div></div>\n        <div class=\"stats\"><div class=\"stat selected\"><span>符合全部条件</span><strong id=\"count-pass\">—</strong><small>入选</small></div><div class=\"stat excluded\"><span>至少一项不符</span><strong id=\"count-fail\">—</strong><small>排除</small></div><div class=\"stat unknown\"><span>必要数据缺失</span><strong id=\"count-unknown\">—</strong><small>待核查</small></div><div class=\"stat delta\"><span>条件变化影响</span><strong id=\"count-delta\">—</strong><small id=\"delta-caption\">相对上一次执行</small></div></div>\n        <div id=\"change-detail\" class=\"change-detail\" hidden></div>\n        <div class=\"result-toolbar\"><div class=\"tabs\" role=\"tablist\" aria-label=\"结果分类\"><button type=\"button\" class=\"tab active\" data-tab=\"pass\" role=\"tab\" aria-selected=\"true\">入选 <span id=\"tab-pass\">0</span></button><button type=\"button\" class=\"tab\" data-tab=\"fail\" role=\"tab\" aria-selected=\"false\">排除 <span id=\"tab-fail\">0</span></button><button type=\"button\" class=\"tab\" data-tab=\"unknown\" role=\"tab\" aria-selected=\"false\">待核查 <span id=\"tab-unknown\">0</span></button><button type=\"button\" class=\"tab\" data-tab=\"compare\" role=\"tab\" aria-selected=\"false\">比较 <span id=\"tab-compare\">0</span></button></div><div class=\"toolbar-right\"><label for=\"stock-search\" class=\"sr-only\">搜索股票</label><input id=\"stock-search\" type=\"search\" placeholder=\"搜索名称 / 代码\"><span class=\"result-tip\">点击股票查看逐项依据</span></div></div>\n        <div id=\"result-list\" class=\"result-list\" role=\"tabpanel\"></div>\n      </section>\n\n      <section id=\"method\" class=\"method-panel\"><div><div class=\"section-index\">METHOD & BOUNDARIES</div><h2>每一步都能说清楚。</h2></div><div class=\"method-cards\"><article><span>01</span><h3>来源明确</h3><p>成分、行情、估值、财务均调用扶摇接口。每个数值保留字段名、口径、时间和请求追踪信息。</p></article><article><span>02</span><h3>缺失可见</h3><p>报告未披露、估值为空或接口失败时，该条件标记“缺失”；不会拿旧值补零，也不会悄悄给出正常结论。</p></article><article><span>03</span><h3>研究边界</h3><p>产品不做收益承诺、确定性涨跌预测或买卖建议。当前只支持上证 50 的实时筛选，不提供历史回测。</p></article></div></section>\n    </main>\n    <footer><div class=\"footer-brand\"><span class=\"brand-mark\">明</span><strong>明筛</strong></div><p>数据支持：扶摇金融数据 API · 供投资研究参考，不构成投资建议</p><a href=\"#top\">回到顶部 ↑</a></footer>\n  </div>\n\n  <dialog id=\"stock-dialog\" aria-labelledby=\"dialog-title\"><div class=\"dialog-content\"><button type=\"button\" id=\"close-dialog\" class=\"dialog-close\" aria-label=\"关闭\">×</button><div id=\"dialog-body\"></div></div></dialog>\n  <dialog id=\"strategies-dialog\" aria-labelledby=\"strategies-title\"><div class=\"dialog-content\"><button type=\"button\" id=\"close-strategies\" class=\"dialog-close\" aria-label=\"关闭\">×</button><div class=\"section-index\">MY RESEARCH</div><h2 id=\"strategies-title\">我的策略</h2><p class=\"strategy-note\">保存的是条件定义；重新打开时会用当前数据再执行一次。</p><div id=\"strategy-list\" class=\"strategy-list\"></div></div></dialog>\n  <div id=\"toast\" class=\"toast\" role=\"status\" aria-live=\"polite\"></div>\n</body>\n</html>\n";
+const css = "@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap');\n\n:root{color-scheme:dark;--bg:#09111c;--panel:#111d2a;--panel2:#142231;--border:#263544;--text:#f2f6f7;--muted:#92a5b0;--soft:#647986;--cyan:#85efcf;--cyan-dark:#3ba98c;--amber:#f4c87a;--red:#ef9a9a;--blue:#a7b9e9;font-family:'DM Sans','Noto Sans SC',system-ui,sans-serif}\n*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}button,input,textarea,select{font:inherit}button{cursor:pointer}a{color:inherit;text-decoration:none}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}\n[hidden]{display:none!important}\n.auth-screen{max-width:1240px;min-height:100vh;margin:auto;padding:72px 42px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(350px,430px);align-items:center;gap:100px}.auth-intro .brand{margin-bottom:75px}.auth-intro h1{font-size:clamp(45px,5vw,77px);line-height:1.2;letter-spacing:-.06em;margin:22px 0}.auth-intro h1 em{font-style:normal;color:var(--cyan)}.auth-intro p{max-width:520px;color:#9bb1bb;line-height:1.9;font-size:15px}.auth-features{display:flex;flex-wrap:wrap;gap:10px;margin-top:40px}.auth-features span{border:1px solid #2c5148;background:#122a2c;color:#a8d7c8;border-radius:999px;font-size:11px;padding:8px 12px}.auth-card{padding:36px}.auth-card h2{font-size:27px;margin:11px 0 5px}.auth-subtitle{font-size:12px;color:#8aa2ac;line-height:1.7}.auth-tabs{display:flex;border-bottom:1px solid #34505b;margin-top:29px;gap:30px}.auth-tab{background:none;border:0;border-bottom:2px solid transparent;padding:0 0 13px;color:#8ba3ae;font-size:13px}.auth-tab.active{color:var(--cyan);border-color:var(--cyan)}#auth-form{display:flex;flex-direction:column;margin-top:24px}#auth-form label{font-size:12px;color:#bbd0d5;margin-bottom:8px}#auth-form input{height:46px;background:#0a1926;border:1px solid #344d59;border-radius:8px;color:#ecf6f6;padding:0 13px;margin-bottom:18px;outline:none}#auth-form input:focus{border-color:var(--cyan)}#auth-form .primary-btn{margin-top:8px;width:100%}.password-hint{font-size:11px;color:#e7c688;line-height:1.6;margin:-6px 0 13px}.auth-error{min-height:20px;margin-top:13px;font-size:11px;color:#f3aaaa}.auth-boundary{border-top:1px solid #2b414b;margin-top:20px;padding-top:16px;color:#718b95;font-size:10px;line-height:1.7}.account-email{max-width:150px;overflow:hidden;text-overflow:ellipsis;color:#b5ccd0}.logout-btn{border:0;background:transparent;color:#83aba8;font-size:11px;padding:5px}.logout-btn:hover{color:var(--cyan)}.strategy-note{color:#91a9b4;font-size:12px;margin:5px 0 22px}.strategy-list{display:grid;gap:9px}.strategy-item{display:flex;justify-content:space-between;align-items:center;gap:13px;padding:14px;border:1px solid #2d4955;border-radius:8px;background:#10212e}.strategy-item strong{font-size:13px;display:block}.strategy-item small{font-size:10px;color:#829ca7}.strategy-item-actions{display:flex;gap:7px}.strategy-item-actions button{background:#18313a;color:#c6e4dd;border:1px solid #3a5a5e;border-radius:5px;padding:7px 9px;font-size:11px}.strategy-item-actions button:hover{border-color:var(--cyan)}\n.ambient{position:fixed;pointer-events:none;z-index:-1;filter:blur(95px);opacity:.28}.ambient-one{width:600px;height:600px;top:-300px;right:-100px;background:#1d796c;border-radius:50%}.ambient-two{width:520px;height:520px;top:600px;left:-280px;background:#253e80;border-radius:50%}\n.shell{max-width:1450px;margin:auto;padding:0 42px}.topbar{height:88px;display:flex;align-items:center;gap:52px;border-bottom:1px solid #243341}.brand{display:flex;align-items:center;gap:11px;min-width:180px}.brand-mark{width:42px;height:42px;display:grid;place-items:center;border-radius:11px;background:var(--cyan);color:#0a1a20;font-size:21px;font-weight:800;box-shadow:0 0 28px #80eac92a}.brand strong{display:block;font-size:23px;letter-spacing:.07em;line-height:1.1}.brand small{display:block;color:var(--soft);font-size:9px;letter-spacing:.21em;margin-top:4px}.topnav{display:flex;gap:31px;color:#acbbc5;font-size:13px}.topnav a:hover,.topnav a:focus-visible{color:var(--cyan)}.top-actions{margin-left:auto;display:flex;align-items:center;gap:9px;color:#9db6b3;font-size:12px;white-space:nowrap}.live-dot{height:7px;width:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 13px var(--cyan)}\n.hero{min-height:405px;display:grid;grid-template-columns:minmax(0,1fr) 324px;gap:70px;align-items:center;padding:47px 0 37px}.eyebrow,.section-index,.side-kicker{font-size:10px;font-weight:700;letter-spacing:.19em;color:var(--cyan);text-transform:uppercase}.eyebrow{display:flex;align-items:center;gap:12px}.eyebrow .line{height:1px;width:25px;background:var(--cyan)}.edition{color:#5d8183;margin-left:12px}.hero h1{font-size:clamp(40px,4.5vw,72px);line-height:1.21;letter-spacing:-.06em;margin:24px 0 17px;font-weight:700}.hero h1 em{font-style:normal;color:var(--cyan)}.hero-copy>p{max-width:650px;font-size:15px;color:#a9bac4;line-height:1.9;margin:0}.hero-points{display:flex;gap:8px;margin-top:24px;flex-wrap:wrap}.hero-points span{border:1px solid #315044;color:#b5d8cd;background:#112b2b;border-radius:999px;padding:6px 13px;font-size:11px}.hero-side{align-self:center;background:linear-gradient(145deg,#17352f,#101f2c 60%,#112333);border:1px solid #2c5148;border-radius:18px;padding:23px 25px;box-shadow:0 20px 60px #0002}.side-kicker{margin-bottom:15px}.flow-step{display:flex;align-items:center;gap:17px;border-top:1px solid #ffffff19;padding:17px 0}.flow-step b{color:var(--cyan);font-size:13px;font-weight:500}.flow-step span{display:flex;flex-direction:column;gap:2px}.flow-step strong{font-size:14px;font-weight:600}.flow-step small{font-size:11px;color:#8ea8a8}.flow-step i{font-style:normal;margin-left:auto;color:#4d8c7f}.side-foot{border-top:1px solid #ffffff19;padding-top:16px;color:#a8d4c5;font-size:11px;letter-spacing:.07em}\n.panel{background:linear-gradient(160deg,#132332,#0f1c29);border:1px solid var(--border);border-radius:17px;box-shadow:0 18px 50px #00000018}.input-panel{padding:30px 32px 24px}.panel-head,.results-head{display:flex;justify-content:space-between;align-items:start;gap:20px}.panel h2,.method-panel h2{font-size:22px;line-height:1.35;letter-spacing:-.035em;margin:8px 0 0}.small-label{font-size:11px;color:#91a9b1;border:1px solid #344655;border-radius:6px;padding:6px 10px;white-space:nowrap}.input-panel textarea{resize:vertical;display:block;width:100%;min-height:108px;border:1px solid #335066;outline:none;background:#0b1724;color:var(--text);border-radius:10px;padding:19px 20px;margin-top:24px;font-size:20px;line-height:1.6}.input-panel textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 3px #85efcf14}.input-panel textarea::placeholder{color:#5e7380}.input-bottom{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-top:16px}.examples{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:#708b9b;font-size:12px}.example{border:1px solid #315065;border-radius:6px;background:#152839;color:#a9c2cc;padding:7px 11px;font-size:11px}.example:hover{border-color:var(--cyan);color:var(--cyan)}.primary-btn{border:0;background:var(--cyan);color:#082122;border-radius:8px;padding:12px 18px;font-weight:700;min-width:167px;box-shadow:0 7px 24px #7ee9c530;white-space:nowrap}.primary-btn span{margin-left:16px}.primary-btn:hover{background:#b4ffe5}.primary-btn:disabled{opacity:.5;cursor:wait}.interpret-status{min-height:19px;margin-top:12px;font-size:11px;color:#8297a1}\n.work-grid{display:grid;grid-template-columns:minmax(0,1fr) 316px;gap:18px;margin-top:20px;align-items:start}.conditions-panel{padding:28px 30px 23px}.universe-line{display:flex;justify-content:space-between;align-items:center;gap:20px;background:#0c1b28;border:1px solid #264154;border-radius:10px;margin-top:24px;padding:16px 19px}.universe-line>div:first-child{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.universe-line .label{color:#8295a1;font-size:11px}.universe-line strong{font-size:14px}.universe-line small{font-size:10px;color:#718a96}.universe-count{display:flex;align-items:baseline;gap:5px;color:var(--cyan);white-space:nowrap}.universe-count strong{font-size:23px}.universe-count span{font-size:11px}.assumptions,.unsupported,.conflicts{font-size:11px;border-radius:8px;margin-top:12px;padding:11px 14px;line-height:1.7}.assumptions{background:#263026;color:#d9d7a7;border:1px solid #555538}.unsupported{background:#3b2a29;color:#f1b9ae;border:1px solid #67443d}.conflicts{background:#462829;color:#ffd1c6;border:1px solid #915553}.condition-list{display:flex;flex-direction:column;gap:10px;margin-top:15px}.condition-card{display:grid;grid-template-columns:26px minmax(135px,1fr) 104px 100px 90px 28px;gap:10px;align-items:center;background:#142432;border:1px solid #2b4151;border-radius:10px;padding:12px}.condition-number{font-size:11px;color:var(--cyan);font-weight:700}.condition-card select,.condition-card input{width:100%;min-height:38px;background:#0b1825;border:1px solid #30495a;border-radius:6px;color:#e6f0f2;padding:0 10px;outline:none;font-size:12px}.condition-card select:focus,.condition-card input:focus{border-color:var(--cyan)}.condition-card input[type=number]{text-align:right}.condition-card .field-label{display:none}.condition-card .remove-condition{border:none;background:transparent;color:#77909b;font-size:19px}.remove-condition:hover{color:var(--red)}.condition-actions{display:flex;align-items:center;justify-content:space-between;margin:13px 0 20px}.text-btn{color:var(--cyan);background:none;border:none;padding:6px 0;font-size:12px}.text-btn:hover{text-decoration:underline}.text-btn.subtle{color:#839ca8}.engine-note{display:flex;align-items:start;gap:13px;border-top:1px solid #2c3d49;padding-top:19px;color:#93a9b2}.engine-note p{font-size:11px;line-height:1.7;margin:0}.engine-note strong{color:#c6e2da;font-size:12px}.engine-icon{width:26px;height:26px;border:1px solid #3d6a62;color:var(--cyan);border-radius:6px;display:grid;place-items:center;flex:none}\n.insight-column{display:flex;flex-direction:column;gap:18px}.status-panel,.lens-panel{padding:27px 25px}.status-panel h2,.lens-panel h2{font-size:19px;margin:8px 0 18px}.data-status{font-size:12px;color:var(--amber);display:flex;align-items:center;gap:8px;margin-bottom:18px}.data-status::before{content:'';width:6px;height:6px;background:currentColor;border-radius:50%}.data-status.ok{color:var(--cyan)}.data-status.error{color:var(--red)}.data-meta{margin:0 0 19px;display:grid;gap:12px}.data-meta>div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #ffffff12;padding-bottom:10px}.data-meta dt{color:#718c98;font-size:11px}.data-meta dd{font-size:11px;color:#b9cbd2;margin:0;text-align:right}.outline-btn{background:transparent;border:1px solid #3b5e67;color:#c7e3df;border-radius:7px;padding:10px 13px;font-size:11px;white-space:nowrap}.outline-btn span{margin-left:20px}.outline-btn:hover{border-color:var(--cyan);color:var(--cyan)}.outline-btn:disabled{opacity:.4}.status-panel>.outline-btn{width:100%;display:flex;justify-content:space-between}.api-issues{font-size:10px;color:var(--amber);line-height:1.5;margin-top:15px}.lens-panel{background:linear-gradient(140deg,#1c302e,#12252a)}.lens-panel p{color:#a2b6b4;font-size:12px;line-height:1.9;margin:0 0 20px}.lens-rule{display:flex;justify-content:space-between;border-top:1px solid #ffffff22;padding-top:13px;color:#a9d2c4;font-size:10px}\n.results-panel{margin-top:20px;padding:31px 31px 26px}.results-head p{color:#8198a5;font-size:12px;margin:9px 0 0}.result-actions{display:flex;gap:8px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin:27px 0 23px}.stat{min-height:107px;position:relative;background:#101e2b;border:1px solid #2e4250;border-radius:10px;padding:18px 18px 15px;display:flex;flex-direction:column}.stat span{color:#8fa4ae;font-size:11px}.stat strong{font-size:31px;line-height:1.1;margin-top:6px;font-weight:600}.stat small{font-size:10px;color:#6f8792;position:absolute;right:17px;bottom:17px}.stat.selected strong{color:var(--cyan)}.stat.excluded strong{color:var(--red)}.stat.unknown strong{color:var(--amber)}.stat.delta strong{color:var(--blue)}.result-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #2d4050}.tabs{display:flex;gap:22px;overflow:auto}.tab{border:0;background:transparent;color:#8297a4;font-size:12px;padding:0 0 15px;white-space:nowrap;border-bottom:2px solid transparent}.tab span{margin-left:4px;color:#587381}.tab.active{color:var(--cyan);border-color:var(--cyan)}.tab.active span{color:var(--cyan)}.toolbar-right{display:flex;align-items:center;gap:14px;padding-bottom:9px}.toolbar-right input{background:#0b1925;color:#e0ecee;border:1px solid #324657;border-radius:7px;padding:8px 11px;width:174px;font-size:11px;outline:none}.toolbar-right input:focus{border-color:var(--cyan)}.result-tip{color:#6e8794;font-size:10px;white-space:nowrap}.result-list{min-height:235px}.stock-row{display:grid;grid-template-columns:32px minmax(170px,1.4fr) repeat(4,minmax(80px,1fr)) 114px;gap:12px;align-items:center;border-bottom:1px solid #253847;padding:15px 4px}.stock-row:hover{background:#ffffff05}.row-select{width:15px;height:15px;accent-color:var(--cyan);cursor:pointer}.stock-main{border:none;background:none;text-align:left;padding:0;color:var(--text)}.stock-main strong{display:block;font-size:13px;font-weight:600}.stock-main small{display:block;color:#78909d;margin-top:3px;font-size:10px}.metric-cell small{display:block;color:#6f8792;font-size:10px}.metric-cell strong{font-size:12px;font-weight:500}.metric-cell .missing{color:var(--amber)}.row-status{display:flex;justify-content:flex-end}.pill{border-radius:100px;padding:5px 9px;font-size:10px;white-space:nowrap}.pill.pass{background:#183d35;color:var(--cyan)}.pill.fail{background:#412b31;color:#f5aaaa}.pill.unknown{background:#443a26;color:#f5ce88}.empty-state{display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:230px;text-align:center;color:#8298a3;padding:25px}.empty-state strong{font-size:15px;color:#c3d5dc}.empty-state p{font-size:11px;max-width:350px;line-height:1.6}.compare-table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}.compare-table th,.compare-table td{text-align:left;padding:13px 12px;border-bottom:1px solid #293d4d}.compare-table th{color:#97acb7;font-weight:500}.compare-table td:first-child{color:#8da3ae}.compare-table .missing{color:var(--amber)}\n.method-panel{display:grid;grid-template-columns:270px 1fr;gap:42px;padding:62px 0 65px}.method-panel h2{font-size:29px}.method-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.method-cards article{border-top:1px solid #3d645e;padding-top:15px}.method-cards span{font-size:11px;color:var(--cyan)}.method-cards h3{font-size:15px;margin:8px 0}.method-cards p{font-size:11px;line-height:1.8;color:#8ca3af;margin:0}footer{border-top:1px solid #263846;display:flex;align-items:center;gap:18px;padding:25px 0 33px;color:#748b97;font-size:10px}footer .footer-brand{display:flex;align-items:center;gap:8px;color:#d8e9e5}footer .brand-mark{height:24px;width:24px;font-size:12px;border-radius:6px}footer p{margin:0}footer a{margin-left:auto}footer a:hover{color:var(--cyan)}\n.change-detail{display:flex;gap:12px;flex-wrap:wrap;align-items:center;background:#172d2c;border:1px solid #345a4f;border-radius:8px;padding:11px 14px;margin:-10px 0 17px;color:#bfe5d8;font-size:11px}.change-detail[hidden]{display:none}.change-detail strong{color:var(--cyan)}\n.tool-footprint{border-top:1px solid #ffffff17;padding:12px 0 14px;margin-top:-4px;font-size:10px;color:#829ba6}.tool-footprint>strong{display:block;color:#b7d4cf;font-size:11px;margin-bottom:8px}.tool-footprint>div{display:flex;justify-content:space-between;gap:8px;padding:3px 0}\ndialog{width:min(760px,calc(100% - 24px));max-height:88vh;padding:0;background:#122332;color:var(--text);border:1px solid #476459;border-radius:15px;box-shadow:0 30px 90px #0009}dialog::backdrop{background:#030b13c9;backdrop-filter:blur(5px)}.dialog-content{padding:31px;overflow:auto;max-height:88vh}.dialog-close{position:absolute;right:18px;top:14px;background:none;border:none;color:#a4b5bb;font-size:26px}.dialog-close:hover{color:white}.dialog-head{display:flex;justify-content:space-between;align-items:start;gap:20px;padding-right:20px}.dialog-head h2{font-size:23px;margin:4px 0}.dialog-head p{color:#8da8b3;font-size:11px;margin:0}.dialog-summary{margin:22px 0;padding:15px;background:#0d1b28;border-radius:8px;color:#b9ced5;font-size:12px}.evidence-table{width:100%;border-collapse:collapse;font-size:11px}.evidence-table th,.evidence-table td{border-bottom:1px solid #2a3e4b;text-align:left;padding:12px 8px;vertical-align:top}.evidence-table th{color:#7e99a6;font-weight:500}.evidence-table td:first-child{font-weight:600}.evidence-table .pill{display:inline-block}.source-card{background:#10202e;border:1px solid #2b4752;border-radius:9px;margin-top:15px;padding:14px}.source-card summary{cursor:pointer;color:var(--cyan);font-size:12px}.source-card p{font-size:10px;color:#9fb4bd;line-height:1.7;overflow-wrap:anywhere}.source-card code{color:#d4e6e4}.toast{position:fixed;right:24px;bottom:24px;background:#203f38;border:1px solid #4d8977;border-radius:8px;padding:10px 14px;color:#c9f4e5;font-size:12px;box-shadow:0 15px 30px #0005;opacity:0;transform:translateY(10px);pointer-events:none;transition:.2s;z-index:10}.toast.show{opacity:1;transform:translateY(0)}\n@media(max-width:1100px){.shell{padding:0 25px}.topbar{gap:25px}.hero{gap:30px}.work-grid{grid-template-columns:minmax(0,1fr) 280px}.condition-card{grid-template-columns:22px minmax(120px,1fr) 85px 77px 77px 20px;gap:6px}.stock-row{grid-template-columns:25px minmax(125px,1.3fr) repeat(4,minmax(65px,1fr)) 78px;gap:8px}.result-tip{display:none}}\n@media(max-width:840px){.topnav{display:none}.topbar{height:70px}.top-actions .live-dot,.top-actions #top-data-state{display:none}.hero{grid-template-columns:1fr;min-height:0;padding:45px 0 30px}.hero-side{display:none}.hero h1{font-size:46px}.work-grid{grid-template-columns:1fr}.insight-column{display:grid;grid-template-columns:1fr 1fr}.results-head{flex-direction:column}.stats{grid-template-columns:repeat(2,1fr)}.method-panel{grid-template-columns:1fr;gap:25px}.stock-row{grid-template-columns:25px minmax(120px,1fr) repeat(2,minmax(65px,1fr)) 75px}.stock-row .metric-cell:nth-of-type(4),.stock-row .metric-cell:nth-of-type(5){display:none}.auth-screen{grid-template-columns:1fr;gap:35px;padding:40px 24px}.auth-intro .brand{margin-bottom:35px}.auth-intro h1{font-size:48px}.auth-card{max-width:520px;width:100%}}\n@media(max-width:620px){.shell{padding:0 16px}.brand strong{font-size:20px}.hero h1{font-size:37px}.hero-copy>p{font-size:13px}.input-panel,.conditions-panel,.results-panel{padding:20px 17px}.input-panel textarea{font-size:16px}.input-bottom{align-items:stretch;flex-direction:column}.primary-btn{width:100%}.panel h2{font-size:19px}.small-label{display:none}.insight-column{grid-template-columns:1fr}.condition-card{grid-template-columns:22px 1fr 1fr 26px;gap:8px}.condition-card select:first-of-type{grid-column:2 / 5}.condition-card .remove-condition{grid-column:4;grid-row:2}.condition-card input{grid-column:3}.condition-card input:last-of-type:not(:first-of-type){grid-column:2 / 4;grid-row:3}.stats{gap:7px}.stat{min-height:95px;padding:14px}.stat strong{font-size:26px}.result-actions{width:100%}.result-actions .outline-btn{flex:1}.result-toolbar{align-items:stretch;flex-direction:column}.tabs{gap:16px}.toolbar-right{padding:0 0 12px}.toolbar-right input{width:100%}.stock-row{grid-template-columns:20px minmax(110px,1fr) 70px 68px;gap:5px}.stock-row .metric-cell:nth-of-type(n+3){display:none}.row-status{grid-column:4}.method-cards{grid-template-columns:1fr}.method-panel{padding:45px 0}footer{flex-wrap:wrap}footer a{margin-left:0}.dialog-content{padding:23px 16px}.evidence-table{font-size:10px}.evidence-table th:nth-child(3),.evidence-table td:nth-child(3){display:none}}\n@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}\n";
+const client = "import { findConflicts, evaluateStock } from '/engine.js';\n\nconst FIELDS = {\n  revenue_yoy: { name: '营业收入同比', short: '营收同比', unit: '%', doc: 'https://fuyao.aicubes.cn/docs/api-reference/financials/' },\n  profit_yoy: { name: '归母净利润同比', short: '利润同比', unit: '%', doc: 'https://fuyao.aicubes.cn/docs/api-reference/financials/' },\n  pe_ttm: { name: '市盈率 TTM', short: 'PE TTM', unit: '倍', doc: 'https://fuyao.aicubes.cn/docs/api-reference/valuations/' },\n  pb_mrq: { name: '市净率 MRQ', short: 'PB MRQ', unit: '倍', doc: 'https://fuyao.aicubes.cn/docs/api-reference/valuations/' },\n  volatility_20d: { name: '20 日年化波动率', short: '20日波动', unit: '%', doc: 'https://fuyao.aicubes.cn/docs/api-reference/prices/' },\n};\nconst OPERATORS = { gt: '>', gte: '≥', lt: '<', lte: '≤', between: '区间' };\nconst DEFAULTS = [\n  { metric: 'revenue_yoy', op: 'gt', value: 0, label: '经营改善：营业收入同比为正' },\n  { metric: 'profit_yoy', op: 'gt', value: 0, label: '经营改善：归母净利润同比为正' },\n  { metric: 'pe_ttm', op: 'gt', value: 0, label: '估值口径：剔除非正市盈率' },\n  { metric: 'pe_ttm', op: 'lte', value: 30, label: '估值合理暂按 PE TTM ≤ 30 倍' },\n  { metric: 'volatility_20d', op: 'lte', value: 30, label: '稳定暂按近 20 日年化波动率 ≤ 30%' },\n];\nconst state = { user: null, market: null, conditions: structuredClone(DEFAULTS), assumptions: ['“估值合理”暂以 PE TTM 0–30 倍表达；“稳定”暂以 20 日年化波动率不超过 30% 表达。两项均为可修改的工作假设。'], unsupported: [], clarifications: [], tab: 'pass', results: [], compare: new Set(), previousPass: null, loading: false, strategies: [] };\nconst $ = selector => document.querySelector(selector);\nconst esc = value => String(value ?? '').replace(/[&<>\"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[char]));\nconst num = (value, digits = 1) => typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(value) : '—';\nconst asDateTime = value => value ? new Date(value).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';\n\nfunction toast(message) {\n  const node = $('#toast'); node.textContent = message; node.classList.add('show');\n  clearTimeout(toast.timer); toast.timer = setTimeout(() => node.classList.remove('show'), 3300);\n}\n\nfunction showAuth() {\n  state.user = null;\n  state.market = null;\n  state.results = [];\n  $('#auth-screen').hidden = false;\n  $('#app-shell').hidden = true;\n  $('#auth-password').value = '';\n}\n\nfunction showApp(user) {\n  state.user = user;\n  $('#account-email').textContent = user.email;\n  $('#auth-screen').hidden = true;\n  $('#app-shell').hidden = false;\n  loadMarket();\n}\n\nfunction authMode(mode) {\n  document.querySelectorAll('.auth-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.authMode === mode));\n  $('#auth-title').textContent = mode === 'register' ? '创建研究账号' : '欢迎使用明筛';\n  $('#auth-submit').innerHTML = mode === 'register' ? '注册并开始研究 <span>→</span>' : '登录并开始研究 <span>→</span>';\n  $('#auth-password').autocomplete = mode === 'register' ? 'new-password' : 'current-password';\n  $('#password-hint').hidden = mode !== 'register';\n  $('#auth-error').textContent = '';\n}\n\ndocument.querySelectorAll('.auth-tab').forEach(tab => tab.addEventListener('click', () => authMode(tab.dataset.authMode)));\n$('#auth-form').addEventListener('submit', async event => {\n  event.preventDefault();\n  const mode = document.querySelector('.auth-tab.active').dataset.authMode;\n  const button = $('#auth-submit'); button.disabled = true;\n  $('#auth-error').textContent = '';\n  try {\n    const response = await fetch(`/api/auth/${mode}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: $('#auth-email').value, password: $('#auth-password').value }) });\n    const result = await response.json();\n    if (!response.ok) throw new Error(result.error || '账号操作失败');\n    showApp(result.user);\n  } catch (error) { $('#auth-error').textContent = error.message; }\n  finally { button.disabled = false; }\n});\n$('#logout-btn').addEventListener('click', async () => {\n  try { await fetch('/api/auth/logout', { method: 'POST' }); }\n  finally { showAuth(); }\n});\n\nfunction renderConditions() {\n  const list = $('#condition-list');\n  list.innerHTML = state.conditions.map((c, index) => `<div class=\"condition-card\" data-index=\"${index}\">\n    <span class=\"condition-number\">${String(index + 1).padStart(2, '0')}</span>\n    <label class=\"sr-only\" for=\"metric-${index}\">指标</label><select id=\"metric-${index}\" data-field=\"metric\">${Object.entries(FIELDS).map(([key, field]) => `<option value=\"${key}\" ${c.metric === key ? 'selected' : ''}>${field.name}</option>`).join('')}</select>\n    <label class=\"sr-only\" for=\"op-${index}\">比较方式</label><select id=\"op-${index}\" data-field=\"op\">${Object.entries(OPERATORS).map(([key, label]) => `<option value=\"${key}\" ${c.op === key ? 'selected' : ''}>${label}</option>`).join('')}</select>\n    <label class=\"sr-only\" for=\"value-${index}\">阈值</label><input id=\"value-${index}\" data-field=\"value\" type=\"number\" step=\"any\" value=\"${Number.isFinite(c.value) ? c.value : 0}\">\n    ${c.op === 'between' ? `<label class=\"sr-only\" for=\"max-${index}\">上限</label><input id=\"max-${index}\" data-field=\"max\" type=\"number\" step=\"any\" value=\"${Number.isFinite(c.max) ? c.max : 30}\">` : `<span class=\"condition-unit\">${FIELDS[c.metric]?.unit || ''}</span>`}\n    <button type=\"button\" class=\"remove-condition\" aria-label=\"删除第 ${index + 1} 条条件\" data-remove=\"${index}\">×</button>\n  </div>`).join('');\n  const assumptionBox = $('#assumptions');\n  assumptionBox.hidden = state.assumptions.length === 0 && state.clarifications.length === 0;\n  assumptionBox.innerHTML = [...state.assumptions.map(item => `工作假设：${esc(item)}`), ...state.clarifications.map(item => `待澄清：${esc(item)}`)].join('<br>');\n  const unsupportedBox = $('#unsupported');\n  unsupportedBox.hidden = state.unsupported.length === 0;\n  unsupportedBox.innerHTML = `<strong>当前数据无法执行：</strong>${state.unsupported.map(esc).join('；')}。这些要求未被静默纳入筛选。`;\n  const conflicts = findConflicts(state.conditions);\n  const conflictBox = $('#conflicts');\n  conflictBox.hidden = conflicts.length === 0;\n  conflictBox.innerHTML = `<strong>条件冲突：</strong>${conflicts.map(esc).join('；')}。请修改阈值后再看结果。`;\n  return conflicts;\n}\n\nfunction conditionText(c) {\n  const field = FIELDS[c.metric];\n  if (!field) return '未知条件';\n  return c.op === 'between' ? `${field.name} ${num(c.value)}–${num(c.max)} ${field.unit}` : `${field.name} ${OPERATORS[c.op]} ${num(c.value)} ${field.unit}`;\n}\n\nfunction execute() {\n  const conflicts = renderConditions();\n  if (!state.market || conflicts.length || !state.conditions.length) {\n    state.results = [];\n    renderStats(null);\n    renderResults();\n    return;\n  }\n  state.results = state.market.stocks.map(stock => evaluateStock(stock, state.conditions));\n  const currentPass = new Set(state.results.filter(item => item.status === 'pass').map(item => item.stock.code));\n  let delta = null;\n  if (state.previousPass) {\n    const addedCodes = [...currentPass].filter(code => !state.previousPass.has(code));\n    const removedCodes = [...state.previousPass].filter(code => !currentPass.has(code));\n    delta = { added: addedCodes.length, removed: removedCodes.length, addedCodes, removedCodes };\n  }\n  state.previousPass = currentPass;\n  renderStats(delta);\n  renderResults();\n}\n\nfunction renderStats(delta) {\n  const counts = { pass: 0, fail: 0, unknown: 0 };\n  state.results.forEach(item => { counts[item.status]++; });\n  for (const key of Object.keys(counts)) {\n    $(`#count-${key}`).textContent = state.market && state.conditions.length && !findConflicts(state.conditions).length ? counts[key] : '—';\n    $(`#tab-${key}`).textContent = counts[key];\n  }\n  $('#tab-compare').textContent = state.compare.size;\n  $('#count-delta').textContent = delta ? `+${delta.added} / −${delta.removed}` : '—';\n  $('#delta-caption').textContent = delta ? '新增入选 / 离开入选' : '相对上一次执行';\n  const changeDetail = $('#change-detail');\n  changeDetail.hidden = !delta || (!delta.added && !delta.removed);\n  if (delta) {\n    const name = code => state.market?.stocks.find(stock => stock.code === code)?.name || code;\n    changeDetail.innerHTML = `<strong>本次条件变化：</strong>${delta.added ? `<span>新入选 ${delta.added} 只：${delta.addedCodes.slice(0, 6).map(code => esc(name(code))).join('、')}${delta.added > 6 ? '等' : ''}</span>` : ''}${delta.removed ? `<span>离开入选 ${delta.removed} 只：${delta.removedCodes.slice(0, 6).map(code => esc(name(code))).join('、')}${delta.removed > 6 ? '等' : ''}</span>` : ''}`;\n  }\n  $('#result-subtitle').textContent = !state.market ? '数据载入后，会按当前条件确定性计算。' : findConflicts(state.conditions).length ? '当前条件存在冲突，需先修改。' : `以上证50当前 ${state.market.universeCount} 只成分股为范围，按 ${state.conditions.length} 条条件计算。`;\n}\n\nfunction statusSummary(item) {\n  if (item.status === 'pass') return '全部通过';\n  const target = item.checks.find(check => check.status === (item.status === 'fail' ? 'fail' : 'unknown'));\n  return `${item.status === 'fail' ? '未满足' : '缺失'}：${FIELDS[target?.condition?.metric]?.short || '条件'}`;\n}\n\nfunction stockRow(item) {\n  const stock = item.stock;\n  const cell = metric => {\n    const value = stock.metrics?.[metric]?.value;\n    return `<div class=\"metric-cell\"><small>${FIELDS[metric].short}</small><strong class=\"${value === null ? 'missing' : ''}\">${num(value)}${value === null ? '' : FIELDS[metric].unit}</strong></div>`;\n  };\n  return `<div class=\"stock-row\"><input class=\"row-select\" type=\"checkbox\" aria-label=\"选择 ${esc(stock.name)} 进行比较\" data-compare=\"${esc(stock.code)}\" ${state.compare.has(stock.code) ? 'checked' : ''}>\n    <button type=\"button\" class=\"stock-main\" data-stock=\"${esc(stock.code)}\"><strong>${esc(stock.name)}</strong><small>${esc(stock.code)} · ${stock.latestPrice === null ? '价格缺失' : `最新价 ${num(stock.latestPrice, 2)} 元`}</small></button>\n    ${cell('revenue_yoy')}${cell('profit_yoy')}${cell('pe_ttm')}${cell('volatility_20d')}\n    <div class=\"row-status\"><span class=\"pill ${item.status}\">${esc(statusSummary(item))}</span></div></div>`;\n}\n\nfunction renderCompare() {\n  const selected = state.results.filter(item => state.compare.has(item.stock.code)).slice(0, 3);\n  if (!selected.length) return `<div class=\"empty-state\"><strong>还没有比较对象</strong><p>在入选、排除或待核查列表勾选最多 3 只股票，即可并排比较关键数值和条件状态。</p></div>`;\n  const rows = [\n    ['筛选状态', item => item.status === 'pass' ? '入选' : item.status === 'fail' ? '排除' : '待核查'],\n    ['营业收入同比', item => `${num(item.stock.metrics.revenue_yoy.value)}%`],\n    ['归母净利润同比', item => `${num(item.stock.metrics.profit_yoy.value)}%`],\n    ['PE TTM', item => `${num(item.stock.metrics.pe_ttm.value)} 倍`],\n    ['PB MRQ', item => `${num(item.stock.metrics.pb_mrq.value)} 倍`],\n    ['20 日年化波动率', item => `${num(item.stock.metrics.volatility_20d.value)}%`],\n  ];\n  return `<table class=\"compare-table\"><thead><tr><th>指标</th>${selected.map(item => `<th><button type=\"button\" class=\"stock-main\" data-stock=\"${esc(item.stock.code)}\"><strong>${esc(item.stock.name)}</strong><small>${esc(item.stock.code)}</small></button></th>`).join('')}</tr></thead><tbody>${rows.map(([label, getValue]) => `<tr><td>${label}</td>${selected.map(item => `<td class=\"${getValue(item).includes('—') ? 'missing' : ''}\">${esc(getValue(item))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;\n}\n\nfunction renderResults() {\n  const list = $('#result-list');\n  if (!state.market) { list.innerHTML = `<div class=\"empty-state\"><strong>正在等待真实数据</strong><p>页面会从扶摇接口获取上证50成分股、财务、估值与历史行情。</p></div>`; return; }\n  if (findConflicts(state.conditions).length || !state.conditions.length) { list.innerHTML = `<div class=\"empty-state\"><strong>尚不能执行筛选</strong><p>请解决冲突，或至少添加一条可执行条件。</p></div>`; return; }\n  if (state.tab === 'compare') { list.innerHTML = renderCompare(); return; }\n  const search = $('#stock-search').value.trim().toLowerCase();\n  const matched = state.results.filter(item => item.status === state.tab && (!search || `${item.stock.name} ${item.stock.code}`.toLowerCase().includes(search)));\n  list.innerHTML = matched.length ? matched.map(stockRow).join('') : `<div class=\"empty-state\"><strong>${search ? '没有匹配的股票' : '这一类目前为空'}</strong><p>${search ? '试试其他名称或股票代码。' : '修改阈值后，结果会重新计算并显示影响。'}</p></div>`;\n}\n\nfunction rawText(raw) {\n  if (!raw) return '无原始字段';\n  if ('currentField' in raw) return `${raw.currentField}: ${num(raw.current, 2)} ${esc(raw.currency || 'CNY')}；同期 ${raw.priorField}: ${num(raw.prior, 2)} ${esc(raw.currency || 'CNY')}`;\n  if ('field' in raw) return `${raw.field}: ${num(raw.value, 3)}`;\n  return `close_price: ${raw.pricePoints || 0} 个交易日数据；${raw.adjust || ''} 复权`;\n}\n\nfunction openStock(code) {\n  const item = state.results.find(row => row.stock.code === code);\n  if (!item) return;\n  const stock = item.stock;\n  const pill = item.status === 'pass' ? '入选' : item.status === 'fail' ? '排除' : '待核查';\n  const evidence = item.checks.map(({ condition, status }) => {\n    const value = stock.metrics[condition.metric];\n    return `<tr><td>${esc(conditionText(condition))}</td><td>${value?.value === null ? '<span class=\"missing\">数据缺失</span>' : `${num(value?.value, 2)} ${esc(value?.unit)}`}</td><td><span class=\"pill ${status}\">${status === 'pass' ? '通过' : status === 'fail' ? '未通过' : '缺失'}</span></td><td>${esc(value?.source?.reportEnd || value?.source?.asOf || '—')}</td></tr>`;\n  }).join('');\n  const sources = [...new Set(item.checks.map(({ condition }) => condition.metric))].map(key => {\n    const value = stock.metrics[key]; const source = value?.source || {};\n    return `<details class=\"source-card\"><summary>${esc(FIELDS[key].name)} · 查看原始依据</summary><p>来源：${esc(source.provider || '—')} · <a href=\"${FIELDS[key].doc}\" target=\"_blank\" rel=\"noopener noreferrer\">字段文档 ↗</a><br>接口：<code>${esc(source.endpoint || '—')}</code><br>报告期：${esc(source.reportEnd || '—')} · 披露日：${esc(source.published || '—')} · 比较期：${esc(source.priorReportEnd || '—')} · 数据日期：${esc(source.asOf || '—')}<br>原始字段：${rawText(value.raw)}<br>计算口径：${esc(source.method || '—')}<br>请求追踪 ID：${esc(source.requestId || '未提供')}</p></details>`;\n  }).join('');\n  $('#dialog-body').innerHTML = `<div class=\"section-index\">EVIDENCE / ${esc(stock.code)}</div><div class=\"dialog-head\"><div><h2 id=\"dialog-title\">${esc(stock.name)}</h2><p>${esc(stock.code)} · 最新价 ${num(stock.latestPrice, 2)} 元 · 行情日期 ${esc(stock.priceAsOf || '—')}</p></div><span class=\"pill ${item.status}\">${pill}</span></div><div class=\"dialog-summary\">${item.status === 'pass' ? '当前所有条件均有数据且通过。' : item.status === 'fail' ? `至少一项未达到条件：${esc(item.checks.filter(row => row.status === 'fail').map(row => conditionText(row.condition)).join('；'))}` : '没有明确未通过的条件，但至少一项必要数据缺失。'}${stock.missing?.length ? `<br>接口情况：${stock.missing.map(esc).join('；')}` : ''}</div><table class=\"evidence-table\"><thead><tr><th>当前条件</th><th>实际数据</th><th>结论</th><th>时点</th></tr></thead><tbody>${evidence}</tbody></table><div style=\"margin-top:22px\" class=\"section-index\">SOURCE TRACE / 原始依据</div>${sources}`;\n  $('#stock-dialog').showModal();\n}\n\nasync function loadMarket(refresh = false) {\n  if (state.loading) return;\n  state.loading = true;\n  $('#refresh-data').disabled = true;\n  $('#data-status').className = 'data-status'; $('#data-status').textContent = refresh ? '正在重新获取真实数据…' : '正在连接扶摇金融数据…';\n  $('#top-data-state').textContent = '正在取数';\n  try {\n    const response = await fetch(`/api/market${refresh ? '?refresh=1' : ''}`);\n    const data = await response.json();\n    if (!response.ok) throw new Error(data.error || `接口返回 ${response.status}`);\n    if (!Array.isArray(data.stocks) || data.stocks.length !== data.universeCount) throw new Error('返回的成分股数据不完整');\n    state.market = data;\n    state.previousPass = null;\n    $('#universe-count').textContent = data.universeCount;\n    $('#universe-asof').textContent = data.universeAsOf || '未提供';\n    $('#fetched-at').textContent = asDateTime(data.fetchedAt);\n    $('#data-status').className = 'data-status ok'; $('#data-status').textContent = `${data.stocks.length} 只成分股已载入 · ${data.cache === 'memory' || data.cache === 'database' ? '15 分钟共享缓存' : '本次实时获取'}`;\n    $('#top-data-state').textContent = '真实数据已连接';\n    $('#tool-footprint').innerHTML = `<strong>工具调用足迹</strong>${(data.toolFootprint || []).map(item => `<div><span>${({ snapshot: '行情快照', valuation: '估值快照', income: '批量利润表', history: '批量日线' })[item.type] || esc(item.type)}</span><span>${item.succeeded}/${item.requests} 成功</span></div>`).join('')}`;\n    const issues = $('#api-issues'); issues.hidden = !data.issues.length;\n    issues.innerHTML = data.issues.length ? `<strong>部分数据获取异常：</strong><br>${data.issues.map(item => `${esc(item.type)} 影响 ${item.affected} 只`).join('<br>')}` : '';\n    execute();\n  } catch (error) {\n    if (/请先注册或登录/.test(error.message)) return showAuth();\n    $('#data-status').className = 'data-status error'; $('#data-status').textContent = error.message || '取数失败';\n    $('#top-data-state').textContent = '数据连接异常';\n    toast('数据连接失败，请检查接口状态后重试');\n    if (!state.market) renderResults();\n  } finally { state.loading = false; $('#refresh-data').disabled = false; }\n}\n\nasync function interpret() {\n  const text = $('#intent-input').value.trim();\n  if (!text) { toast('请先输入选股意图'); return; }\n  const button = $('#interpret-btn'); button.disabled = true; $('#interpret-status').textContent = 'AI 正在把语言翻译为可检查条件…';\n  try {\n    const response = await fetch('/api/interpret', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });\n    const result = await response.json();\n    if (!response.ok) throw new Error(result.error || '解析失败');\n    if (!result.conditions.length) {\n      state.unsupported = result.unsupported || [];\n      state.clarifications = result.clarifications || [];\n      state.assumptions = result.assumptions || [];\n      renderConditions();\n      $('#interpret-status').textContent = '没有识别出可由当前 5 个指标执行的条件。请修改描述或手动添加条件。';\n      return;\n    }\n    state.conditions = result.conditions;\n    state.assumptions = result.assumptions || [];\n    state.unsupported = result.unsupported || [];\n    state.clarifications = result.clarifications || [];\n    $('#interpret-status').textContent = `已生成 ${result.conditions.length} 条条件草案。请核对阈值；AI 仅负责翻译，筛选结果由规则计算。`;\n    execute();\n    $('#conditions').scrollIntoView({ behavior: 'smooth', block: 'start' });\n  } catch (error) { if (/请先注册或登录/.test(error.message)) return showAuth(); $('#interpret-status').textContent = error.message; toast('AI 暂不可用，可手动修改当前条件'); }\n  finally { button.disabled = false; }\n}\n\n$('#interpret-btn').addEventListener('click', interpret);\ndocument.querySelectorAll('.example').forEach(button => button.addEventListener('click', () => { $('#intent-input').value = button.dataset.prompt; $('#intent-input').focus(); }));\n$('#condition-list').addEventListener('change', event => {\n  const card = event.target.closest('.condition-card'); if (!card) return;\n  const index = Number(card.dataset.index); const field = event.target.dataset.field;\n  if (!field) return;\n  state.conditions[index][field] = field === 'value' || field === 'max' ? Number(event.target.value) : event.target.value;\n  if (field === 'op' && event.target.value === 'between' && !Number.isFinite(state.conditions[index].max)) state.conditions[index].max = 30;\n  state.conditions[index].label = '用户已修改';\n  execute();\n});\n$('#condition-list').addEventListener('click', event => {\n  const remove = event.target.closest('[data-remove]'); if (!remove) return;\n  state.conditions.splice(Number(remove.dataset.remove), 1); execute();\n});\n$('#add-condition').addEventListener('click', () => { if (state.conditions.length >= 8) return toast('最多支持 8 条条件'); state.conditions.push({ metric: 'revenue_yoy', op: 'gte', value: 0, label: '用户添加' }); execute(); });\n$('#reset-conditions').addEventListener('click', () => { state.conditions = structuredClone(DEFAULTS); state.assumptions = ['示例阈值均可修改；PE TTM 范围与年化波动率不是统一投资标准。']; state.unsupported = []; state.clarifications = []; execute(); toast('已恢复示例条件'); });\n$('#refresh-data').addEventListener('click', () => loadMarket(true));\ndocument.querySelectorAll('.tab').forEach(button => button.addEventListener('click', () => { state.tab = button.dataset.tab; document.querySelectorAll('.tab').forEach(tab => { tab.classList.toggle('active', tab === button); tab.setAttribute('aria-selected', String(tab === button)); }); renderResults(); }));\n$('#stock-search').addEventListener('input', renderResults);\n$('#result-list').addEventListener('click', event => { const button = event.target.closest('[data-stock]'); if (button) openStock(button.dataset.stock); });\n$('#result-list').addEventListener('change', event => {\n  const box = event.target.closest('[data-compare]'); if (!box) return;\n  if (box.checked && state.compare.size >= 3) { box.checked = false; toast('最多比较 3 只股票'); return; }\n  if (box.checked) state.compare.add(box.dataset.compare); else state.compare.delete(box.dataset.compare);\n  $('#tab-compare').textContent = state.compare.size;\n  if (state.tab === 'compare') renderResults();\n});\n$('#close-dialog').addEventListener('click', () => $('#stock-dialog').close());\n$('#stock-dialog').addEventListener('click', event => { if (event.target === $('#stock-dialog')) $('#stock-dialog').close(); });\n$('#save-strategy').addEventListener('click', async () => {\n  if (!state.conditions.length || findConflicts(state.conditions).length) return toast('请先保留至少一条无冲突条件');\n  try {\n    const text = $('#intent-input').value.trim();\n    const response = await fetch('/api/strategies', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: text.slice(0, 60) || '手动筛选策略', text, conditions: state.conditions, assumptions: state.assumptions }) });\n    const result = await response.json();\n    if (!response.ok) throw new Error(result.error || '保存失败');\n    toast('策略已保存到账号，可在其他设备登录后读取');\n  } catch (error) { toast(error.message); }\n});\n\nasync function listStrategies() {\n  const response = await fetch('/api/strategies');\n  const data = await response.json();\n  if (!response.ok) throw new Error(data.error || '读取失败');\n  state.strategies = data.strategies;\n  $('#strategy-list').innerHTML = state.strategies.length ? state.strategies.map(item => `<div class=\"strategy-item\"><div><strong>${esc(item.title)}</strong><small>${item.conditions.length} 条条件 · ${asDateTime(item.updatedAt)}</small></div><div class=\"strategy-item-actions\"><button type=\"button\" data-load=\"${esc(item.id)}\">载入</button><button type=\"button\" data-delete=\"${esc(item.id)}\">删除</button></div></div>`).join('') : '<div class=\"empty-state\"><strong>还没有已保存策略</strong><p>调整并执行条件后，点击“保存本次条件”。</p></div>';\n}\n$('#load-strategy').addEventListener('click', async () => {\n  try { await listStrategies(); $('#strategies-dialog').showModal(); }\n  catch (error) { toast(error.message); }\n});\n$('#close-strategies').addEventListener('click', () => $('#strategies-dialog').close());\n$('#strategies-dialog').addEventListener('click', event => { if (event.target === $('#strategies-dialog')) $('#strategies-dialog').close(); });\n$('#strategy-list').addEventListener('click', async event => {\n  const loadButton = event.target.closest('[data-load]');\n  if (loadButton) {\n    const saved = state.strategies.find(item => item.id === loadButton.dataset.load);\n    if (!saved) return;\n    state.conditions = saved.conditions.filter(c => FIELDS[c.metric] && OPERATORS[c.op]).slice(0, 8);\n    state.assumptions = saved.assumptions || [];\n    state.unsupported = []; state.clarifications = [];\n    $('#intent-input').value = saved.text || '';\n    $('#strategies-dialog').close(); execute();\n    toast('已按当前市场数据重新执行保存的条件');\n    return;\n  }\n  const deleteButton = event.target.closest('[data-delete]');\n  if (deleteButton) {\n    try {\n      const response = await fetch(`/api/strategies/${deleteButton.dataset.delete}`, { method: 'DELETE' });\n      const result = await response.json();\n      if (!response.ok || !result.deleted) throw new Error(result.error || '删除失败');\n      await listStrategies(); toast('已删除策略');\n    } catch (error) { toast(error.message); }\n  }\n});\n\nrenderConditions(); renderResults();\nfetch('/api/session').then(async response => { const result = await response.json(); if (!response.ok) throw new Error(result.error); if (result.user) showApp(result.user); else showAuth(); }).catch(error => { showAuth(); $('#auth-error').textContent = error.message || '账号服务暂不可用'; });\n";
+const engine = "const METRIC_NAMES = {\n  revenue_yoy: '营业收入同比',\n  profit_yoy: '归母净利润同比',\n  pe_ttm: '市盈率 TTM',\n  pb_mrq: '市净率 MRQ',\n  volatility_20d: '20 日年化波动率',\n};\n\nexport function findConflicts(conditions) {\n  const errors = [];\n  for (const [metric, name] of Object.entries(METRIC_NAMES)) {\n    let low = -Infinity, high = Infinity, lowInclusive = true, highInclusive = true;\n    for (const c of conditions.filter(item => item.metric === metric)) {\n      if (!Number.isFinite(c.value) || (c.op === 'between' && !Number.isFinite(c.max))) { errors.push(`${name} 的阈值不是有效数字`); continue; }\n      if (c.op === 'between' && c.value > c.max) errors.push(`${name} 的区间下限高于上限`);\n      const lowers = c.op === 'gt' || c.op === 'gte' || c.op === 'between';\n      const uppers = c.op === 'lt' || c.op === 'lte' || c.op === 'between';\n      if (lowers && (c.value > low || (c.value === low && c.op === 'gt'))) { low = c.value; lowInclusive = c.op !== 'gt'; }\n      const top = c.op === 'between' ? c.max : c.value;\n      if (uppers && (top < high || (top === high && c.op === 'lt'))) { high = top; highInclusive = c.op !== 'lt'; }\n    }\n    if (low > high || (low === high && (!lowInclusive || !highInclusive))) errors.push(`${name} 同时要求高于 ${low} 且低于 ${high}`);\n  }\n  return [...new Set(errors)];\n}\n\nexport function check(stock, condition) {\n  const value = stock.metrics?.[condition.metric]?.value;\n  if (!Number.isFinite(value)) return 'unknown';\n  const target = condition.value;\n  if (condition.op === 'gt') return value > target ? 'pass' : 'fail';\n  if (condition.op === 'gte') return value >= target ? 'pass' : 'fail';\n  if (condition.op === 'lt') return value < target ? 'pass' : 'fail';\n  if (condition.op === 'lte') return value <= target ? 'pass' : 'fail';\n  if (condition.op === 'between') return value >= target && value <= condition.max ? 'pass' : 'fail';\n  return 'unknown';\n}\n\nexport function evaluateStock(stock, conditions) {\n  const checks = conditions.map(condition => ({ condition, status: check(stock, condition) }));\n  const status = checks.some(item => item.status === 'fail') ? 'fail' : checks.some(item => item.status === 'unknown') ? 'unknown' : 'pass';\n  return { stock, checks, status };\n}\n";
+
+const BASE = 'https://fuyao.aicubes.cn';
+const UNIVERSE = '000016.SH';
+const METRICS = new Set(['revenue_yoy', 'profit_yoy', 'pe_ttm', 'pb_mrq', 'volatility_20d']);
+const SESSION_DAYS = 7;
+const encoder = new TextEncoder();
+
+function accountJson(body, status = 200, headers = {}) {
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers } });
+}
+
+function db(env) {
+  if (!env.DB?.prepare) throw new Error('账号数据库尚未连接');
+  return env.DB;
+}
+
+function base64(bytes) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function unbase64(value) {
+  return Uint8Array.from(atob(value), char => char.charCodeAt(0));
+}
+
+async function sha256(text) {
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(text)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function passwordHash(password, salt) {
+  const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
+  return base64(new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: unbase64(salt), iterations: 210000 }, key, 256)));
+}
+
+function equalBytes(a, b) {
+  const left = unbase64(a); const right = unbase64(b);
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let i = 0; i < left.length; i++) difference |= left[i] ^ right[i];
+  return difference === 0;
+}
+
+async function rateLimit(database, key, max, windowMs) {
+  const period = Math.floor(Date.now() / windowMs);
+  const scope = `${key}:${period}`;
+  await database.prepare('INSERT INTO request_rates (key, period, count) VALUES (?, ?, 1) ON CONFLICT(key) DO UPDATE SET count = count + 1').bind(scope, period).run();
+  const row = await database.prepare('SELECT count FROM request_rates WHERE key = ?').bind(scope).first();
+  return row.count <= max;
+}
+
+function sameOrigin(request) {
+  const origin = request.headers.get('origin');
+  if (origin && origin !== new URL(request.url).origin) return false;
+  return request.headers.get('sec-fetch-site') !== 'cross-site';
+}
+
+function sessionCookie(token, request) {
+  const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : '';
+  return `ms_session=${token}; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=${SESSION_DAYS * 86400}`;
+}
+
+function clearCookie(request) {
+  return sessionCookie('', request).replace(/Max-Age=\d+/, 'Max-Age=0');
+}
+
+async function createSession(database, userId, request) {
+  const token = base64(crypto.getRandomValues(new Uint8Array(32))).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+  const now = Date.now();
+  await database.prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').bind(await sha256(token), userId, now, now + SESSION_DAYS * 86400000).run();
+  return sessionCookie(token, request);
+}
+
+async function currentUser(request, env) {
+  const token = request.headers.get('cookie')?.match(/(?:^|;\s*)ms_session=([^;]+)/)?.[1];
+  if (!token) return null;
+  const row = await db(env).prepare('SELECT u.id, u.email FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?').bind(await sha256(token), Date.now()).first();
+  return row ? { id: row.id, email: row.email } : null;
+}
+
+function validConditions(value) {
+  return Array.isArray(value) && value.length > 0 && value.length <= 8 && value.every(item => item && METRICS.has(item.metric) && ['gt', 'gte', 'lt', 'lte', 'between'].includes(item.op) && Number.isFinite(item.value) && (item.op !== 'between' || Number.isFinite(item.max)));
+}
+
+async function accountRoute(request, env, url) {
+  const database = db(env);
+  const path = url.pathname;
+  const method = request.method;
+  if (method !== 'GET' && !sameOrigin(request)) return accountJson({ error: '跨站请求被拒绝' }, 403);
+  if (path === '/api/session' && method === 'GET') return accountJson({ user: await currentUser(request, env) });
+
+  if ((path === '/api/auth/register' || path === '/api/auth/login') && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    const email = String(body.email || '').trim().toLowerCase();
+    const password = String(body.password || '');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return accountJson({ error: '请输入有效邮箱地址' }, 400);
+    const ip = request.headers.get('cf-connecting-ip') || 'local';
+    const identity = await sha256(`${ip}:${email}`);
+    const limit = path.endsWith('register') ? 5 : 10;
+    if (!await rateLimit(database, `${path}:${identity}`, limit, path.endsWith('register') ? 3600000 : 900000)) return accountJson({ error: '尝试次数过多，请稍后再试' }, 429);
+    if (path.endsWith('register')) {
+      if (password.length < 12 || password.length > 128) return accountJson({ error: '密码长度须为 12–128 个字符' }, 400);
+      const existing = await database.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+      if (existing) return accountJson({ error: '此邮箱已注册，请登录' }, 409);
+      const id = crypto.randomUUID();
+      const salt = base64(crypto.getRandomValues(new Uint8Array(16)));
+      const hash = await passwordHash(password, salt);
+      try { await database.prepare('INSERT INTO users (id, email, password_salt, password_hash, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, email, salt, hash, Date.now()).run(); }
+      catch { return accountJson({ error: '邮箱已注册或注册失败' }, 409); }
+      return accountJson({ user: { id, email } }, 201, { 'set-cookie': await createSession(database, id, request) });
+    }
+    const user = await database.prepare('SELECT id, email, password_salt, password_hash FROM users WHERE email = ?').bind(email).first();
+    const candidate = await passwordHash(password, user?.password_salt || base64(new Uint8Array(16)));
+    if (!user || !equalBytes(candidate, user.password_hash)) return accountJson({ error: '邮箱或密码不正确' }, 401);
+    return accountJson({ user: { id: user.id, email: user.email } }, 200, { 'set-cookie': await createSession(database, user.id, request) });
+  }
+
+  const user = await currentUser(request, env);
+  if (!user) return accountJson({ error: '请先登录账号' }, 401);
+  if (path === '/api/auth/logout' && method === 'POST') {
+    const token = request.headers.get('cookie')?.match(/(?:^|;\s*)ms_session=([^;]+)/)?.[1];
+    if (token) await database.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256(token)).run();
+    return accountJson({ ok: true }, 200, { 'set-cookie': clearCookie(request) });
+  }
+
+  if (path === '/api/strategies' && method === 'GET') {
+    const result = await database.prepare('SELECT id, title, prompt, conditions_json, assumptions_json, created_at, updated_at FROM strategies WHERE user_id = ? ORDER BY updated_at DESC LIMIT 50').bind(user.id).all();
+    return accountJson({ strategies: result.results.map(row => ({ id: row.id, title: row.title, text: row.prompt, conditions: JSON.parse(row.conditions_json), assumptions: JSON.parse(row.assumptions_json), createdAt: row.created_at, updatedAt: row.updated_at })) });
+  }
+  if (path === '/api/strategies' && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    if (!validConditions(body.conditions)) return accountJson({ error: '策略条件无效，至少需要一条可执行条件' }, 400);
+    const title = String(body.title || body.text || '未命名策略').trim().slice(0, 80);
+    const prompt = String(body.text || '').slice(0, 500);
+    const assumptions = Array.isArray(body.assumptions) ? body.assumptions.slice(0, 8).map(x => String(x).slice(0, 160)) : [];
+    const id = crypto.randomUUID(); const now = Date.now();
+    await database.prepare('INSERT INTO strategies (id, user_id, title, prompt, conditions_json, assumptions_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(id, user.id, title, prompt, JSON.stringify(body.conditions), JSON.stringify(assumptions), now, now).run();
+    return accountJson({ id, title, savedAt: now }, 201);
+  }
+  const match = path.match(/^\/api\/strategies\/([0-9a-f-]{36})$/);
+  if (match && method === 'DELETE') {
+    const result = await database.prepare('DELETE FROM strategies WHERE id = ? AND user_id = ?').bind(match[1], user.id).run();
+    return accountJson({ deleted: result.meta?.changes || 0 });
+  }
+  return accountJson({ error: '未知账号接口' }, 404);
+}
+
+let marketCache = null;
+let marketPromise = null;
+
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  });
+}
+
+function chunks(items, size) {
+  const out = [];
+  for (let index = 0; index < items.length; index += size) out.push(items.slice(index, index + size));
+  return out;
+}
+
+async function fuyao(env, path, params, timeoutMs = 18000) {
+  if (!env.FUYAO_API_KEY) throw new Error('金融数据服务尚未配置');
+  const url = new URL(path, BASE);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, String(value));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: { 'X-api-key': env.FUYAO_API_KEY, accept: 'application/json' },
+      signal: controller.signal,
+    });
+    const body = await response.json();
+    if (!response.ok || body.code !== 0 || !body.data) {
+      throw new Error(`${path} 返回 ${body.code ?? response.status}: ${body.message || '未知错误'}`);
+    }
+    return { data: body.data, requestId: body.request_id || null };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function limitedMap(items, limit, task) {
+  const results = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      try { results[index] = { ok: true, value: await task(items[index]) }; }
+      catch (error) { results[index] = { ok: false, error: String(error?.message || error) }; }
+    }
+  }));
+  return results;
+}
+
+function validNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function date(ms) {
+  return typeof ms === 'number' && Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : null;
+}
+
+function metric(value, unit, source, extras = {}) {
+  return { value: validNumber(value), unit, source, ...extras };
+}
+
+function growth(current, previous) {
+  if (!Number.isFinite(current) || !Number.isFinite(previous) || previous <= 0) return null;
+  return ((current / previous) - 1) * 100;
+}
+
+function volatility(bars) {
+  const closes = bars.map(row => validNumber(row.close_price)).filter(value => value !== null);
+  if (closes.length < 21) return null;
+  const last = closes.slice(-21);
+  const returns = [];
+  for (let index = 1; index < last.length; index++) {
+    if (last[index - 1] <= 0) return null;
+    returns.push(Math.log(last[index] / last[index - 1]));
+  }
+  const average = returns.reduce((sum, value) => sum + value, 0) / returns.length;
+  const variance = returns.reduce((sum, value) => sum + (value - average) ** 2, 0) / (returns.length - 1);
+  return Math.sqrt(variance * 252) * 100;
+}
+
+function normalize(universe, snapshotResult, valuationResult, incomeGroups, priceGroups, issues) {
+  const snapshots = new Map((snapshotResult?.data?.item || []).map(row => [row.thscode, row]));
+  const valuations = new Map((valuationResult?.data?.item || []).map(row => [row.thscode, row]));
+  const incomes = new Map(incomeGroups.map(group => [group.thscode, group]));
+  const histories = new Map(priceGroups.map(group => [group.thscode, group]));
+  return universe.map(stock => {
+    const code = stock.thscode;
+    const incomeGroup = incomes.get(code);
+    const rows = (incomeGroup?.item || []).filter(row => row?.period_end_ms && row?.report_date_ms && row.report_date_ms <= Date.now());
+    const latest = rows[0] || null;
+    const comparable = latest ? rows.find(row => row.fiscal_year === latest.fiscal_year - 1 && row.fiscal_period === latest.fiscal_period) : null;
+    const valuation = valuations.get(code);
+    const history = histories.get(code);
+    const bars = (history?.item || []).filter(row => row?.date_ms && row.date_ms <= Date.now());
+    const snap = snapshots.get(code);
+    const incomeSource = {
+      provider: '扶摇金融数据', endpoint: '/api/a-share/financials/income-statements-batch',
+      requestId: incomeGroup?._requestId || null,
+      reportEnd: date(latest?.period_end_ms), published: date(latest?.report_date_ms),
+      priorReportEnd: date(comparable?.period_end_ms), priorPublished: date(comparable?.report_date_ms),
+      method: '同一财报期间的本年累计值 ÷ 上年同期累计值 − 1；上年值≤0时记为缺失',
+    };
+    const valuationSource = {
+      provider: '扶摇金融数据', endpoint: '/api/a-share/valuations/snapshot',
+      requestId: valuationResult?.requestId || null,
+      asOf: date(valuationResult?.data?.timestamp), method: '接口原始估值；TTM 为近十二个月，MRQ 为最新报告期',
+    };
+    const historySource = {
+      provider: '扶摇金融数据', endpoint: '/api/a-share/prices/historical-batch',
+      requestId: history?._requestId || null, asOf: date(bars.at(-1)?.date_ms),
+      method: '前复权日收盘价最近21个点的20个对数收益率，样本标准差 × √252，单位%',
+    };
+    return {
+      code, name: stock.name || snap?.name || valuation?.name || code,
+      latestPrice: validNumber(snap?.last_price),
+      priceAsOf: date(snapshotResult?.data?.timestamp),
+      metrics: {
+        revenue_yoy: metric(growth(latest?.operating_income, comparable?.operating_income), '%', incomeSource, {
+          raw: { currentField: 'operating_income', current: validNumber(latest?.operating_income), priorField: 'operating_income', prior: validNumber(comparable?.operating_income), currency: latest?.currency || 'CNY' },
+        }),
+        profit_yoy: metric(growth(latest?.parent_holder_net_profit, comparable?.parent_holder_net_profit), '%', incomeSource, {
+          raw: { currentField: 'parent_holder_net_profit', current: validNumber(latest?.parent_holder_net_profit), priorField: 'parent_holder_net_profit', prior: validNumber(comparable?.parent_holder_net_profit), currency: latest?.currency || 'CNY' },
+        }),
+        pe_ttm: metric(valuation?.pe_ttm, '倍', valuationSource, { raw: { field: 'pe_ttm', value: validNumber(valuation?.pe_ttm) } }),
+        pb_mrq: metric(valuation?.pb_mrq, '倍', valuationSource, { raw: { field: 'pb_mrq', value: validNumber(valuation?.pb_mrq) } }),
+        volatility_20d: metric(volatility(bars), '%', historySource, { raw: { closeField: 'close_price', pricePoints: bars.length, adjust: 'forward', interval: '1d' } }),
+      },
+      missing: issues.filter(issue => issue.codes.includes(code)).map(issue => issue.message),
+    };
+  });
+}
+
+async function loadMarket(env) {
+  const universeResult = await fuyao(env, '/api/a-share-index/constituents/ths-stock-list', { thscode: UNIVERSE });
+  const universe = universeResult.data.item || [];
+  if (universe.length < 40 || universe.length > 60) throw new Error(`上证50成分数量异常：${universe.length}`);
+  const codes = universe.map(item => item.thscode);
+  const batches = chunks(codes, 10);
+  const priceStart = Date.now() - 125 * 86400000;
+  const priceEnd = Date.now();
+  const jobs = [
+    { type: 'snapshot', codes, path: '/api/a-share/prices/snapshot', params: { thscodes: codes.join(',') } },
+    { type: 'valuation', codes, path: '/api/a-share/valuations/snapshot', params: { thscodes: codes.join(',') } },
+    ...batches.map(batch => ({ type: 'income', codes: batch, path: '/api/a-share/financials/income-statements-batch', params: { thscodes: batch.join(','), period: 'quarterly', limit: 12 } })),
+    ...batches.map(batch => ({ type: 'history', codes: batch, path: '/api/a-share/prices/historical-batch', params: { thscodes: batch.join(','), interval: '1d', adjust: 'forward', start: priceStart, end: priceEnd } })),
+  ];
+  const done = await limitedMap(jobs, 4, job => fuyao(env, job.path, job.params, 25000));
+  const issues = [];
+  let snapshotResult = null;
+  let valuationResult = null;
+  const incomeGroups = [];
+  const priceGroups = [];
+  done.forEach((result, index) => {
+    const job = jobs[index];
+    if (!result.ok) {
+      issues.push({ type: job.type, codes: job.codes, message: `${job.type}：${result.error}` });
+      return;
+    }
+    const value = result.value;
+    if (job.type === 'snapshot') snapshotResult = value;
+    if (job.type === 'valuation') valuationResult = value;
+    if (job.type === 'income') incomeGroups.push(...(value.data.item || []).map(group => ({ ...group, _requestId: value.requestId })));
+    if (job.type === 'history') priceGroups.push(...(value.data.item || []).map(group => ({ ...group, _requestId: value.requestId })));
+  });
+  return {
+    universe: '上证50', universeCode: UNIVERSE, universeCount: universe.length,
+    universeAsOf: date(universeResult.data.timestamp), fetchedAt: new Date().toISOString(),
+    stocks: normalize(universe, snapshotResult, valuationResult, incomeGroups, priceGroups, issues),
+    issues: issues.map(({ type, codes, message }) => ({ type, affected: codes.length, message })),
+    toolFootprint: ['snapshot', 'valuation', 'income', 'history'].map(type => ({
+      type, requests: jobs.filter(job => job.type === type).length,
+      succeeded: jobs.filter((job, index) => job.type === type && done[index].ok).length,
+    })),
+    notes: ['数据为当前接口快照，财务报告期与行情时点可能不同。', '当前不做历史回测，不把今天的成分与数据用于过去的策略收益计算。'],
+  };
+}
+
+async function interpret(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const text = typeof body.text === 'string' ? body.text.trim().slice(0, 500) : '';
+  if (!text) return json({ error: '请输入选股意图' }, 400);
+  if (!env.DEEPSEEK_API_KEY) return json({ error: 'AI 解析服务尚未配置' }, 503);
+  const system = `你是选股条件翻译器，只输出 JSON 对象，不输出股票、预测、买卖建议。股票池固定上证50。允许的 metric 仅有 revenue_yoy（营业收入同比增长率%）、profit_yoy（归母净利润同比增长率%）、pe_ttm（市盈率TTM倍）、pb_mrq（市净率MRQ倍）、volatility_20d（近20交易日年化波动率%）。每个 condition 为 {"metric":"...","op":"gte|lte|gt|lt|between","value":数值,"max":数值可选,"label":"简短中文解释"}。模糊的经营改善默认 revenue_yoy>0 且 profit_yoy>0；估值合理默认两条条件 pe_ttm>0 与 pe_ttm<=30，并在 assumptions 中说明这只是用户可改的工作假设；走势稳定默认 volatility_20d<=30，同样说明假设。若用户给出明确阈值，按阈值。不能由这5个字段表达的要求放入 unsupported，绝不悄悄忽略。若语义冲突，仍保留原始条件并写入 clarifications。输出键：conditions 数组、assumptions 字符串数组、unsupported 字符串数组、clarifications 字符串数组。最多8条条件。`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 22000);
+  try {
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST', signal: controller.signal,
+      headers: { authorization: `Bearer ${env.DEEPSEEK_API_KEY}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'deepseek-chat', temperature: 0, max_tokens: 900, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: text }] }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(`模型接口返回 ${response.status}`);
+    const parsed = JSON.parse(result.choices?.[0]?.message?.content || '{}');
+    const conditions = (Array.isArray(parsed.conditions) ? parsed.conditions : []).slice(0, 8).filter(item => {
+      return item && METRICS.has(item.metric) && ['gte', 'lte', 'gt', 'lt', 'between'].includes(item.op) && Number.isFinite(item.value) && (item.op !== 'between' || Number.isFinite(item.max));
+    }).flatMap(item => item.metric === 'pe_ttm' && item.op === 'between' && item.value === 0
+      ? [{ metric: 'pe_ttm', op: 'gt', value: 0, label: '市盈率为正' }, { metric: 'pe_ttm', op: 'lte', value: item.max, label: String(item.label || '').slice(0, 80) }]
+      : [{ metric: item.metric, op: item.op, value: item.value, ...(item.op === 'between' ? { max: item.max } : {}), label: String(item.label || '').slice(0, 80) }]).slice(0, 8);
+    return json({ conditions, assumptions: stringList(parsed.assumptions), unsupported: stringList(parsed.unsupported), clarifications: stringList(parsed.clarifications), model: result.model || 'deepseek-chat' });
+  } catch (error) {
+    return json({ error: `AI 解析失败：${error?.message || '未知错误'}` }, 502);
+  } finally { clearTimeout(timer); }
+}
+
+function stringList(value) { return (Array.isArray(value) ? value : []).slice(0, 8).map(item => String(item).slice(0, 160)); }
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (url.pathname === '/') return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+    if (url.pathname === '/app.css') return new Response(css, { headers: { 'content-type': 'text/css; charset=utf-8' } });
+    if (url.pathname === '/app.js') return new Response(client, { headers: { 'content-type': 'application/javascript; charset=utf-8' } });
+    if (url.pathname === '/engine.js') return new Response(engine, { headers: { 'content-type': 'application/javascript; charset=utf-8' } });
+    if (!url.pathname.startsWith('/api/')) return new Response('Not found', { status: 404 });
+    if (Number(request.headers.get('content-length') || 0) > 8192) return json({ error: '请求内容过大' }, 413);
+    try {
+      if (url.pathname === '/api/session' || url.pathname.startsWith('/api/auth/') || url.pathname.startsWith('/api/strategies')) return await accountRoute(request, env, url);
+      const user = await currentUser(request, env);
+      if (!user) return json({ error: '请先注册或登录账号' }, 401);
+      if (url.pathname === '/api/interpret' && request.method === 'POST') {
+        if (!sameOrigin(request)) return json({ error: '跨站请求被拒绝' }, 403);
+        if (!await rateLimit(db(env), `ai:${user.id}`, 20, 86400000)) return json({ error: '今日 AI 解析次数已达上限，可继续手动修改条件。' }, 429);
+        return interpret(request, env);
+      }
+      if (url.pathname === '/api/market' && request.method === 'GET') {
+        const refresh = url.searchParams.get('refresh') === '1';
+        if (refresh) {
+          if (!await rateLimit(db(env), `refresh:${user.id}`, 2, 3600000)) return json({ error: '本小时刷新次数已达上限，请稍后重试' }, 429);
+          marketCache = null;
+        }
+        if (!refresh && marketCache && Date.now() - marketCache.time < 15 * 60 * 1000) return json({ ...marketCache.data, cache: 'memory' });
+        if (!refresh) {
+          const cached = await db(env).prepare('SELECT data_json, fetched_at FROM market_cache WHERE id = 1').first();
+          if (cached && Date.now() - cached.fetched_at < 15 * 60 * 1000) {
+            const data = JSON.parse(cached.data_json);
+            marketCache = { data, time: cached.fetched_at };
+            return json({ ...data, cache: 'database' });
+          }
+        }
+        if (!marketPromise) marketPromise = loadMarket(env).finally(() => { marketPromise = null; });
+        try {
+          const data = await marketPromise;
+          const now = Date.now();
+          marketCache = { data, time: now };
+          await db(env).prepare('INSERT INTO market_cache (id, data_json, fetched_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET data_json = excluded.data_json, fetched_at = excluded.fetched_at').bind(JSON.stringify(data), now).run();
+          return json({ ...data, cache: 'fresh' });
+        } catch (error) { return json({ error: `金融数据获取失败：${error?.message || '未知错误'}` }, 502); }
+      }
+    } catch (error) {
+      return json({ error: /数据库尚未连接/.test(String(error?.message)) ? '账号数据库暂不可用' : '服务暂不可用，请稍后重试' }, 503);
+    }
+    return new Response('Not found', { status: 404 });
+  },
+};

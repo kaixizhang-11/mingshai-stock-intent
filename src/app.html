@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="明筛：把自然语言选股意图转成可检查、可修改、可执行的上证50筛选条件。">
+  <title>明筛 · 自然语言选股解释器</title>
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+  <section id="auth-screen" class="auth-screen" aria-labelledby="auth-title">
+    <div class="auth-intro"><div class="brand"><span class="brand-mark">明</span><span><strong>明筛</strong><small>INTENT → EVIDENCE</small></span></div><div class="section-index">AI STOCK RESEARCH WORKSPACE</div><h1>让每个选股想法<br><em>都有据可查。</em></h1><p>用自然语言提出意图，确认 AI 生成的条件，再用真实市场数据检查每只股票的入选、排除与缺失依据。</p><div class="auth-features"><span>01 / DeepSeek 意图解析</span><span>02 / 扶摇金融数据</span><span>03 / 跨设备保存策略</span></div></div>
+    <div class="auth-card panel"><div class="section-index">YOUR RESEARCH ACCOUNT</div><h2 id="auth-title">欢迎使用明筛</h2><p class="auth-subtitle">注册或登录后开始研究；每位用户的策略独立保存。</p><div class="auth-tabs"><button type="button" class="auth-tab active" data-auth-mode="login">登录</button><button type="button" class="auth-tab" data-auth-mode="register">注册账号</button></div><form id="auth-form"><label for="auth-email">邮箱</label><input id="auth-email" type="email" autocomplete="email" required placeholder="name@example.com" maxlength="254"><label for="auth-password">密码</label><input id="auth-password" type="password" autocomplete="current-password" required minlength="12" maxlength="128" placeholder="至少 12 个字符"><div id="password-hint" class="password-hint" hidden>使用至少 12 个字符。请保管好密码；当前版本尚无邮件找回功能。</div><button id="auth-submit" type="submit" class="primary-btn">登录并开始研究 <span>→</span></button><div id="auth-error" class="auth-error" role="alert" aria-live="polite"></div></form><div class="auth-boundary">研究工具仅展示可追溯数据与条件结果，不提供买卖建议或收益承诺。</div></div>
+  </section>
+  <div id="app-shell" class="shell" hidden>
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="明筛首页"><span class="brand-mark">明</span><span><strong>明筛</strong><small>INTENT → EVIDENCE</small></span></a>
+      <nav class="topnav" aria-label="页面导航"><a href="#conditions">条件工作台</a><a href="#results">筛选结果</a><a href="#method">数据与边界</a></nav>
+      <div class="top-actions"><span class="live-dot"></span><span id="top-data-state">等待数据连接</span><span class="account-email" id="account-email"></span><button type="button" id="logout-btn" class="logout-btn">退出</button></div>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="line"></span> FINANCIAL RESEARCH WORKSPACE <span class="edition">01 / STOCK SCREENING</span></div>
+          <h1>把模糊想法，<br><em>变成看得见的条件。</em></h1>
+          <p>说出你的选股意图。AI 帮你翻译，筛选引擎按真实数据执行；每一只股票的入选、排除和数据缺口，都可以逐条核对。</p>
+          <div class="hero-points"><span>上证 50 成分股</span><span>条件可编辑</span><span>结论有来源</span></div>
+        </div>
+        <div class="hero-side" aria-label="产品工作流">
+          <div class="side-kicker">THE WORKFLOW</div>
+          <div class="flow-step"><b>01</b><span><strong>表达意图</strong><small>自然语言输入</small></span><i>↗</i></div>
+          <div class="flow-step"><b>02</b><span><strong>确认条件</strong><small>口径、阈值、冲突</small></span><i>↗</i></div>
+          <div class="flow-step"><b>03</b><span><strong>核对结果</strong><small>入选、排除、缺失</small></span><i>↗</i></div>
+          <div class="side-foot">AI 提议 · 规则计算 · 数据作证</div>
+        </div>
+      </section>
+
+      <section class="input-panel panel" aria-labelledby="intent-title">
+        <div class="panel-head"><div><div class="section-index">01 / 意图输入</div><h2 id="intent-title">你想找什么样的公司？</h2></div><span class="small-label">自然语言 → 条件草案</span></div>
+        <label class="sr-only" for="intent-input">输入选股意图</label>
+        <textarea id="intent-input" maxlength="500" placeholder="例如：经营改善、估值合理、走势相对稳定">经营改善、估值合理、走势相对稳定</textarea>
+        <div class="input-bottom"><div class="examples"><span>试试：</span><button type="button" class="example" data-prompt="经营改善、估值合理、走势相对稳定">稳健经营</button><button type="button" class="example" data-prompt="营收同比增长超过10%，市盈率低于25倍">增长与估值</button><button type="button" class="example" data-prompt="市盈率高于40倍，同时低于20倍">冲突条件</button></div><button type="button" id="interpret-btn" class="primary-btn">解析选股意图 <span>→</span></button></div>
+        <div id="interpret-status" class="interpret-status" role="status" aria-live="polite">AI 只翻译意图，不决定股票是否入选。</div>
+      </section>
+
+      <div class="work-grid">
+        <section id="conditions" class="conditions-panel panel" aria-labelledby="conditions-title">
+          <div class="panel-head"><div><div class="section-index">02 / 条件工作台</div><h2 id="conditions-title">让每个判断有明确口径</h2></div><span class="small-label">可直接修改</span></div>
+          <div class="universe-line"><div><span class="label">筛选范围</span><strong>上证 50</strong><small>当前成分股 · 非全 A 股</small></div><div class="universe-count"><strong id="universe-count">—</strong><span>只股票</span></div></div>
+          <div id="assumptions" class="assumptions" hidden></div>
+          <div id="unsupported" class="unsupported" hidden></div>
+          <div id="conflicts" class="conflicts" hidden role="alert"></div>
+          <div id="condition-list" class="condition-list"></div>
+          <div class="condition-actions"><button type="button" id="add-condition" class="text-btn">＋ 添加条件</button><button type="button" id="reset-conditions" class="text-btn subtle">恢复示例</button></div>
+          <div class="engine-note"><span class="engine-icon">≡</span><p><strong>职责边界</strong><br>AI 生成条件草案；你决定阈值；筛选引擎只按当前数据和条件计算。无法取到的数据记为“待核查”，不会默认为通过。</p></div>
+        </section>
+
+        <aside class="insight-column">
+          <section class="status-panel panel"><div class="section-index">DATA STATUS</div><h2>数据现场</h2><div id="data-status" class="data-status">正在连接扶摇金融数据…</div><dl class="data-meta"><div><dt>成分范围</dt><dd id="universe-asof">—</dd></div><div><dt>最近取数</dt><dd id="fetched-at">—</dd></div><div><dt>数据接口</dt><dd>扶摇金融数据</dd></div></dl><div id="tool-footprint" class="tool-footprint"></div><button type="button" id="refresh-data" class="outline-btn">刷新真实数据 <span>↗</span></button><div id="api-issues" class="api-issues" hidden></div></section>
+          <section class="lens-panel panel"><div class="section-index">THE LENS</div><h2>“合理”由你定义</h2><p>市盈率、利润增长和波动率都只是可核查的量化视角。跨行业比较会产生偏差；筛选结果是研究线索，不是收益预测。</p><div class="lens-rule"><span>事实</span><span>计算</span><span>不确定性</span></div></section>
+        </aside>
+      </div>
+
+      <section id="results" class="results-panel panel" aria-labelledby="results-title">
+        <div class="results-head"><div><div class="section-index">03 / 可解释结果</div><h2 id="results-title">谁符合，谁不符合，为什么</h2><p id="result-subtitle">数据载入后，会按当前条件确定性计算。</p></div><div class="result-actions"><button type="button" id="save-strategy" class="outline-btn">保存本次条件</button><button type="button" id="load-strategy" class="outline-btn">读取已保存条件</button></div></div>
+        <div class="stats"><div class="stat selected"><span>符合全部条件</span><strong id="count-pass">—</strong><small>入选</small></div><div class="stat excluded"><span>至少一项不符</span><strong id="count-fail">—</strong><small>排除</small></div><div class="stat unknown"><span>必要数据缺失</span><strong id="count-unknown">—</strong><small>待核查</small></div><div class="stat delta"><span>条件变化影响</span><strong id="count-delta">—</strong><small id="delta-caption">相对上一次执行</small></div></div>
+        <div id="change-detail" class="change-detail" hidden></div>
+        <div class="result-toolbar"><div class="tabs" role="tablist" aria-label="结果分类"><button type="button" class="tab active" data-tab="pass" role="tab" aria-selected="true">入选 <span id="tab-pass">0</span></button><button type="button" class="tab" data-tab="fail" role="tab" aria-selected="false">排除 <span id="tab-fail">0</span></button><button type="button" class="tab" data-tab="unknown" role="tab" aria-selected="false">待核查 <span id="tab-unknown">0</span></button><button type="button" class="tab" data-tab="compare" role="tab" aria-selected="false">比较 <span id="tab-compare">0</span></button></div><div class="toolbar-right"><label for="stock-search" class="sr-only">搜索股票</label><input id="stock-search" type="search" placeholder="搜索名称 / 代码"><span class="result-tip">点击股票查看逐项依据</span></div></div>
+        <div id="result-list" class="result-list" role="tabpanel"></div>
+      </section>
+
+      <section id="method" class="method-panel"><div><div class="section-index">METHOD & BOUNDARIES</div><h2>每一步都能说清楚。</h2></div><div class="method-cards"><article><span>01</span><h3>来源明确</h3><p>成分、行情、估值、财务均调用扶摇接口。每个数值保留字段名、口径、时间和请求追踪信息。</p></article><article><span>02</span><h3>缺失可见</h3><p>报告未披露、估值为空或接口失败时，该条件标记“缺失”；不会拿旧值补零，也不会悄悄给出正常结论。</p></article><article><span>03</span><h3>研究边界</h3><p>产品不做收益承诺、确定性涨跌预测或买卖建议。当前只支持上证 50 的实时筛选，不提供历史回测。</p></article></div></section>
+    </main>
+    <footer><div class="footer-brand"><span class="brand-mark">明</span><strong>明筛</strong></div><p>数据支持：扶摇金融数据 API · 供投资研究参考，不构成投资建议</p><a href="#top">回到顶部 ↑</a></footer>
+  </div>
+
+  <dialog id="stock-dialog" aria-labelledby="dialog-title"><div class="dialog-content"><button type="button" id="close-dialog" class="dialog-close" aria-label="关闭">×</button><div id="dialog-body"></div></div></dialog>
+  <dialog id="strategies-dialog" aria-labelledby="strategies-title"><div class="dialog-content"><button type="button" id="close-strategies" class="dialog-close" aria-label="关闭">×</button><div class="section-index">MY RESEARCH</div><h2 id="strategies-title">我的策略</h2><p class="strategy-note">保存的是条件定义；重新打开时会用当前数据再执行一次。</p><div id="strategy-list" class="strategy-list"></div></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

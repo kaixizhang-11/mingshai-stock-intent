@@ -1,0 +1,11 @@
+{
+  "name": "mingshai-stock-intent",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "validate": "node scripts/validate-artifact.mjs",
+    "dev": "bash scripts/build.sh && node scripts/dev.mjs",
+    "test": "node --test tests/*.test.mjs"
+  }
+}
